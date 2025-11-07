@@ -1,0 +1,247 @@
+Big-Tech ML Engineer v12(group): GroupKFold + v11 CatBoost + OOF Isotonic 전략 시작.
+전처리된 메인 피처 로드 중... (매우 빠름)
+데이터 로드 완료: (944767, 118)
+
+[INFO] Group K-Fold 교차 검증 분리 시작...
+StratifiedGroupKFold 사용 (라벨 분포 + 그룹 동시 고려).
+5-Fold 분리 완료. (PrimaryKey 기준 그룹 분리)
+
+=== Fold 1/5 학습 시작 ===
+
+[Fold 1] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (신규 자격) 학습 ---
+
+[A] CatBoost (Base, v11 세팅) 학습 시작... (피처 111개)
+0:	test: 0.5749777	best: 0.5749777 (0)	total: 633ms	remaining: 31m 38s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.6784847801
+bestIteration = 241
+
+Shrink model to first 242 iterations.
+
+[A] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.6785, Brier: 0.0217, ECE: 0.0030
+  Combined Score: 0.16694
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.6807, Brier: 0.0217, ECE: 0.0000
+  Combined Score: 0.16505
+
+--- 모델 B (자격 유지) 학습 ---
+
+[B] CatBoost (Tuned for B, v13) 학습 시작... (피처 157개)
+0:	test: 0.5424719	best: 0.5424719 (0)	total: 287ms	remaining: 38m 19s
+Stopped by overfitting detector  (300 iterations wait)
+
+bestTest = 0.5677290715
+bestIteration = 61
+
+Shrink model to first 62 iterations.
+
+[B] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.5677, Brier: 0.2105, ECE: 0.4137
+  Combined Score: 0.37220
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.5713, Brier: 0.0393, ECE: 0.0000
+  Combined Score: 0.22420
+
+=== Fold 2/5 학습 시작 ===
+
+[Fold 2] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (신규 자격) 학습 ---
+
+[A] CatBoost (Base, v11 세팅) 학습 시작... (피처 111개)
+0:	test: 0.5777690	best: 0.5777690 (0)	total: 707ms	remaining: 35m 19s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.6792757694
+bestIteration = 330
+
+Shrink model to first 331 iterations.
+
+[A] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.6793, Brier: 0.0222, ECE: 0.0036
+  Combined Score: 0.16682
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.6813, Brier: 0.0222, ECE: 0.0000
+  Combined Score: 0.16489
+
+--- 모델 B (자격 유지) 학습 ---
+
+[B] CatBoost (Tuned for B, v13) 학습 시작... (피처 157개)
+0:	test: 0.5004581	best: 0.5004581 (0)	total: 299ms	remaining: 39m 48s
+Stopped by overfitting detector  (300 iterations wait)
+
+bestTest = 0.5752447711
+bestIteration = 105
+
+Shrink model to first 106 iterations.
+
+[B] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.5752, Brier: 0.1983, ECE: 0.3979
+  Combined Score: 0.36142
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.5795, Brier: 0.0399, ECE: 0.0000
+  Combined Score: 0.22023
+
+=== Fold 3/5 학습 시작 ===
+
+[Fold 3] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (신규 자격) 학습 ---
+
+[A] CatBoost (Base, v11 세팅) 학습 시작... (피처 111개)
+0:	test: 0.5009439	best: 0.5009439 (0)	total: 307ms	remaining: 15m 19s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.67070846
+bestIteration = 493
+
+Shrink model to first 494 iterations.
+
+[A] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.6707, Brier: 0.0220, ECE: 0.0035
+  Combined Score: 0.17102
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.6733, Brier: 0.0220, ECE: 0.0000
+  Combined Score: 0.16886
+
+--- 모델 B (자격 유지) 학습 ---
+
+[B] CatBoost (Tuned for B, v13) 학습 시작... (피처 157개)
+0:	test: 0.5060963	best: 0.5060963 (0)	total: 296ms	remaining: 39m 30s
+Stopped by overfitting detector  (300 iterations wait)
+
+bestTest = 0.581591432
+bestIteration = 149
+
+Shrink model to first 150 iterations.
+
+[B] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.5816, Brier: 0.2098, ECE: 0.4115
+  Combined Score: 0.36451
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.5854, Brier: 0.0404, ECE: 0.0000
+  Combined Score: 0.21742
+
+=== Fold 4/5 학습 시작 ===
+
+[Fold 4] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (신규 자격) 학습 ---
+
+[A] CatBoost (Base, v11 세팅) 학습 시작... (피처 111개)
+0:	test: 0.5002277	best: 0.5002277 (0)	total: 273ms	remaining: 13m 38s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.6784085653
+bestIteration = 464
+
+Shrink model to first 465 iterations.
+
+[A] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.6784, Brier: 0.0217, ECE: 0.0030
+  Combined Score: 0.16698
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.6811, Brier: 0.0217, ECE: 0.0000
+  Combined Score: 0.16485
+
+--- 모델 B (자격 유지) 학습 ---
+
+[B] CatBoost (Tuned for B, v13) 학습 시작... (피처 157개)
+0:	test: 0.5001309	best: 0.5001309 (0)	total: 297ms	remaining: 39m 37s
+Stopped by overfitting detector  (300 iterations wait)
+
+bestTest = 0.5711003132
+bestIteration = 72
+
+Shrink model to first 73 iterations.
+
+[B] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.5711, Brier: 0.2133, ECE: 0.4151
+  Combined Score: 0.37154
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.5757, Brier: 0.0409, ECE: 0.0000
+  Combined Score: 0.22238
+
+=== Fold 5/5 학습 시작 ===
+
+[Fold 5] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (신규 자격) 학습 ---
+
+[A] CatBoost (Base, v11 세팅) 학습 시작... (피처 111개)
+0:	test: 0.5450735	best: 0.5450735 (0)	total: 641ms	remaining: 32m 3s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.6863608118
+bestIteration = 258
+
+Shrink model to first 259 iterations.
+
+[A] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.6864, Brier: 0.0219, ECE: 0.0030
+  Combined Score: 0.16302
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.6890, Brier: 0.0218, ECE: 0.0000
+  Combined Score: 0.16096
+
+--- 모델 B (자격 유지) 학습 ---
+
+[B] CatBoost (Tuned for B, v13) 학습 시작... (피처 157개)
+0:	test: 0.5413173	best: 0.5413173 (0)	total: 337ms	remaining: 44m 55s
+Stopped by overfitting detector  (300 iterations wait)
+
+bestTest = 0.5598516467
+bestIteration = 135
+
+Shrink model to first 136 iterations.
+
+[B] 단독 확률 보정 (Isotonic, Fold 내부용) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.5599, Brier: 0.2224, ECE: 0.4255
+  Combined Score: 0.38206
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.5642, Brier: 0.0412, ECE: 0.0000
+  Combined Score: 0.22819
+
+[INFO] K-Fold PK Stats 병합...
+
+[INFO] Global Isotonic Recalibration (OOF 기반) 시작...
+[INFO] Global Isotonic A 보정기 학습/저장 완료. (샘플 647241개)
+[INFO] Global Isotonic B 보정기 학습/저장 완료. (샘플 297526개)
+
+[INFO] 최종 산출물:
+  - CatBoost A 모델 5개: catboost_A_fold0~4.pkl
+  - CatBoost B 모델 5개: catboost_B_fold0~4.pkl
+  - Fold별 보정기 10개: calibrator_A/B_fold0~4.pkl
+  - Global 보정기 2개: calibrator_A_global.pkl, calibrator_B_global.pkl
+  - 최종 PK Stats 1개: ./model\pk_stats_final.csv
+Big-Tech ML Engineer v12(group): 미션 완료.
+
+[INFO] OOF 기반 전체 성능 평가 시작...
+
+[OOF] A 검사만 (Test_x == 'A') 점수:
+  AUC: 0.6793, Brier: 0.0219, ECE: 0.0000
+  Combined Score: 0.16584
+
+[OOF] B 검사만 (Test_x == 'B') 점수:
+  AUC: 0.5637, Brier: 0.0404, ECE: 0.0000
+  Combined Score: 0.22827
+
+[OOF] A+B 전체 통합 점수:
+  AUC: 0.6704, Brier: 0.0277, ECE: 0.0000
+  Combined Score: 0.17172
+
+[INFO] OOF 기반 평가 완료. 이 점수를 보고 제출 여부를 결정하세요.
