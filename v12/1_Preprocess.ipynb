@@ -1,0 +1,594 @@
+## ----------------------------------------------------------------
+## [Jupyter용] 1_Preprocess.ipynb
+##  - PDF 도메인 지식 기반 Feature Engineering
+##  - 학습/추론(script.py)와 100% 동일한 전처리 규약 유지
+## ----------------------------------------------------------------
+
+import os
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+import warnings
+import joblib
+
+tqdm.pandas()
+warnings.filterwarnings('ignore')
+
+print("데이터 전처리 파이프라인 시작 (10-15분 가량 소요 예정)...")
+
+## 1. 로컬 경로 설정 및 데이터 로드
+BASE_DIR = "./data"
+MODEL_SAVE_DIR = "./model"
+os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
+
+try:
+    train_meta = pd.read_csv(os.path.join(BASE_DIR, "train.csv"))
+    train_A_raw = pd.read_csv(os.path.join(BASE_DIR, "train", "A.csv"))
+    train_B_raw = pd.read_csv(os.path.join(BASE_DIR, "train", "B.csv"))
+except FileNotFoundError:
+    print(f"경고: '{BASE_DIR}' 경로에 파일이 없습니다. data 폴더에 원본 데이터를 넣어주세요.")
+    raise
+
+print("데이터 로드 완료:", train_meta.shape, train_A_raw.shape, train_B_raw.shape)
+
+
+## 2. 전처리 유틸
+def convert_age(val):
+    if pd.isna(val):
+        return np.nan
+    try:
+        s = str(val)
+        base = int(s[:-1])
+        return base if s[-1] == "a" else base + 5
+    except Exception:
+        return np.nan
+
+
+def split_testdate(val):
+    try:
+        v = int(val)
+        return v // 100, v % 100
+    except Exception:
+        return np.nan, np.nan
+
+
+def seq_mean(series: pd.Series) -> pd.Series:
+    return series.fillna("").progress_apply(
+        lambda x: np.fromstring(x, sep=",").mean() if x else np.nan
+    )
+
+
+def seq_std(series: pd.Series) -> pd.Series:
+    return series.fillna("").progress_apply(
+        lambda x: np.fromstring(x, sep=",").std() if x else np.nan
+    )
+
+
+def masked_operation(cond_series, val_series, target_conds, operation='mean'):
+    """
+    cond_series: '1,2,1,...'처럼 조건코드가 들어있는 문자열 시퀀스
+    val_series : 같은 길이의 값 시퀀스 (RT 또는 정답코드)
+    target_conds: 선택할 조건 값(들)
+    operation: 'mean' / 'std' / 'rate' / 'rate_yn' 지원
+    """
+    cond_df = cond_series.fillna("").str.split(",", expand=True).replace("", np.nan).to_numpy(dtype=float)
+    val_df = val_series.fillna("").str.split(",", expand=True).replace("", np.nan).to_numpy(dtype=float)
+
+    if isinstance(target_conds, (list, set, tuple)):
+        mask = np.isin(cond_df, list(target_conds))
+    else:
+        mask = (cond_df == target_conds)
+
+    masked_vals = np.where(mask, val_df, np.nan)
+
+    with np.errstate(invalid="ignore"):
+        if operation == 'mean':
+            sums = np.nansum(masked_vals, axis=1)
+            counts = np.sum(mask, axis=1)
+            out = sums / np.where(counts == 0, np.nan, counts)
+        elif operation == 'std':
+            out = np.nanstd(masked_vals, axis=1)
+        elif operation in ('rate', 'rate_yn'):
+            # 정답코드가 1, 오답이 0 또는 2 인 상황을 모두 커버
+            corrects = np.nansum(np.where(masked_vals == 1, 1, 0), axis=1)
+            total = np.sum(mask, axis=1)
+            out = corrects / np.where(total == 0, np.nan, total)
+        else:
+            # 혹시 모르는 경우 mean으로 처리
+            sums = np.nansum(masked_vals, axis=1)
+            counts = np.sum(mask, axis=1)
+            out = sums / np.where(counts == 0, np.nan, counts)
+
+    return pd.Series(out, index=cond_series.index)
+
+
+def seq_rate_A3(series, target_codes):
+    """A3-5: valid/invalid + correct/incorrect 조합코드 비율"""
+    def calc(x):
+        if not x:
+            return np.nan
+        s = x.split(',')
+        correct = sum(s.count(code) for code in target_codes if code in ['1', '3'])
+        incorrect = sum(s.count(code) for code in target_codes if code in ['2', '4'])
+        total = correct + incorrect
+        return correct / total if total > 0 else np.nan
+
+    return series.fillna("").progress_apply(calc)
+
+
+def seq_rate_B1_B2(series, target_codes):
+    """B1-3, B2-3: change / non-change 조건 정확도"""
+    def calc(x):
+        if not x:
+            return np.nan
+        s = x.split(',')
+        correct = sum(s.count(code) for code in target_codes if code in ['1', '3'])
+        incorrect = sum(s.count(code) for code in target_codes if code in ['2', '4'])
+        total = correct + incorrect
+        return correct / total if total > 0 else np.nan
+
+    return series.fillna("").progress_apply(calc)
+
+
+def seq_rate_B4(series, target_codes):
+    """B4-1: Flanker congruent/incongruent 정확도"""
+    def calc(x):
+        if not x:
+            return np.nan
+        s = x.split(',')
+        correct = sum(s.count(code) for code in target_codes if code in ['1', '3', '5'])
+        incorrect = sum(s.count(code) for code in target_codes if code in ['2', '4', '6'])
+        total = correct + incorrect
+        return correct / total if total > 0 else np.nan
+
+    return series.fillna("").progress_apply(calc)
+
+
+def seq_rate_simple(series):
+    """B3, B5, B6, B7, B8 등 1=정답, 2=오답"""
+    def calc(x):
+        if not x:
+            return np.nan
+        s = x.split(',')
+        correct = s.count('1')
+        incorrect = s.count('2')
+        total = correct + incorrect
+        return correct / total if total > 0 else np.nan
+
+    return series.fillna("").progress_apply(calc)
+
+
+## 3. 1차 Feature Engineering (A/B 각각)
+def preprocess_A(df: pd.DataFrame) -> pd.DataFrame:
+    print("Step 1 (A): Age, TestDate 파생...")
+    df["Age_num"] = df["Age"].map(convert_age)
+    ym = df["TestDate"].map(split_testdate)
+    df["Year"] = [y for y, m in ym]
+    df["Month"] = [m for y, m in ym]
+
+    feats = pd.DataFrame(index=df.index)
+    print("Step 2 (A): A1~A5 features (도메인 피처)...")
+
+    # A1 (속도 예측)
+    feats["A1_rt_mean"] = seq_mean(df["A1-4"])
+    feats["A1_rt_std"] = seq_std(df["A1-4"])
+    feats["A1_rt_left"] = masked_operation(df["A1-1"], df["A1-4"], 1, 'mean')
+    feats["A1_rt_right"] = masked_operation(df["A1-1"], df["A1-4"], 2, 'mean')
+    feats["A1_rt_slow"] = masked_operation(df["A1-2"], df["A1-4"], 1, 'mean')
+    feats["A1_rt_norm"] = masked_operation(df["A1-2"], df["A1-4"], 2, 'mean')
+    feats["A1_rt_fast"] = masked_operation(df["A1-2"], df["A1-4"], 3, 'mean')
+    feats["A1_acc_slow"] = masked_operation(df["A1-2"], df["A1-3"], 1, 'rate')
+    feats["A1_acc_norm"] = masked_operation(df["A1-2"], df["A1-3"], 2, 'rate')
+    feats["A1_acc_fast"] = masked_operation(df["A1-2"], df["A1-3"], 3, 'rate')
+
+    # A2 (정지 예측)
+    feats["A2_rt_mean"] = seq_mean(df["A2-4"])
+    feats["A2_rt_std"] = seq_std(df["A2-4"])
+    feats["A2_rt_slow_c1"] = masked_operation(df["A2-1"], df["A2-4"], 1, 'mean')
+    feats["A2_rt_norm_c1"] = masked_operation(df["A2-1"], df["A2-4"], 2, 'mean')
+    feats["A2_rt_fast_c1"] = masked_operation(df["A2-1"], df["A2-4"], 3, 'mean')
+    feats["A2_rt_slow_c2"] = masked_operation(df["A2-2"], df["A2-4"], 1, 'mean')
+    feats["A2_rt_norm_c2"] = masked_operation(df["A2-2"], df["A2-4"], 2, 'mean')
+    feats["A2_rt_fast_c2"] = masked_operation(df["A2-2"], df["A2-4"], 3, 'mean')
+    feats["A2_acc_slow"] = masked_operation(df["A2-1"], df["A2-3"], 1, 'rate')
+    feats["A2_acc_norm"] = masked_operation(df["A2-1"], df["A2-3"], 2, 'rate')
+    feats["A2_acc_fast"] = masked_operation(df["A2-1"], df["A2-3"], 3, 'rate')
+
+    # A3 (주의 전환)
+    feats["A3_valid_acc"] = seq_rate_A3(df["A3-5"], ['1', '2'])
+    feats["A3_invalid_acc"] = seq_rate_A3(df["A3-5"], ['3', '4'])
+    feats["A3_rt_mean"] = seq_mean(df["A3-7"])
+    feats["A3_rt_std"] = seq_std(df["A3-7"])
+    feats["A3_rt_small"] = masked_operation(df["A3-1"], df["A3-7"], 1, 'mean')
+    feats["A3_rt_big"] = masked_operation(df["A3-1"], df["A3-7"], 2, 'mean')
+    feats["A3_rt_left"] = masked_operation(df["A3-3"], df["A3-7"], 1, 'mean')
+    feats["A3_rt_right"] = masked_operation(df["A3-3"], df["A3-7"], 2, 'mean')
+
+    # A4 (Stroop)
+    feats["A4_rt_mean"] = seq_mean(df["A4-5"])
+    feats["A4_rt_std"] = seq_std(df["A4-5"])
+    feats["A4_rt_congruent"] = masked_operation(df["A4-1"], df["A4-5"], 1, 'mean')
+    feats["A4_rt_incongruent"] = masked_operation(df["A4-1"], df["A4-5"], 2, 'mean')
+    feats["A4_acc_congruent"] = masked_operation(df["A4-1"], df["A4-3"], 1, 'rate')
+    feats["A4_acc_incongruent"] = masked_operation(df["A4-1"], df["A4-3"], 2, 'rate')
+
+    # A5 (변화 탐지)
+    feats["A5_acc_nonchange"] = masked_operation(df["A5-1"], df["A5-2"], 1, 'rate')
+    feats["A5_acc_pos_change"] = masked_operation(df["A5-1"], df["A5-2"], 2, 'rate')
+    feats["A5_acc_color_change"] = masked_operation(df["A5-1"], df["A5-2"], 3, 'rate')
+    feats["A5_acc_shape_change"] = masked_operation(df["A5-1"], df["A5-2"], 4, 'rate')
+
+    # A6, A7 (문제풀이)
+    feats["A6_correct_count"] = df["A6-1"]
+    feats["A7_correct_count"] = df["A7-1"]
+
+    # A8, A9 (질문지) - 원래 이름 그대로 사용 (하이픈)
+    feats["A8-1"] = df["A8-1"]
+    feats["A8-2"] = df["A8-2"]
+    feats["A9-1"] = df["A9-1"]
+    feats["A9-2"] = df["A9-2"]
+    feats["A9-3"] = df["A9-3"]
+    feats["A9-4"] = df["A9-4"]
+    feats["A9-5"] = df["A9-5"]
+
+    seq_cols = [
+        "A1-1","A1-2","A1-3","A1-4",
+        "A2-1","A2-2","A2-3","A2-4",
+        "A3-1","A3-2","A3-3","A3-4","A3-5","A3-6","A3-7",
+        "A4-1","A4-2","A4-3","A4-4","A4-5",
+        "A5-1","A5-2","A5-3",
+        "A6-1","A7-1","A8-1","A8-2",
+        "A9-1","A9-2","A9-3","A9-4","A9-5"
+    ]
+    print("A 검사 1차 전처리 완료")
+    return pd.concat([df, feats], axis=1).drop(columns=seq_cols, errors="ignore")
+
+
+def preprocess_B(df: pd.DataFrame) -> pd.DataFrame:
+    print("Step 1 (B): Age, TestDate 파생...")
+    df["Age_num"] = df["Age"].map(convert_age)
+    ym = df["TestDate"].map(split_testdate)
+    df["Year"] = [y for y, m in ym]
+    df["Month"] = [m for y, m in ym]
+
+    feats = pd.DataFrame(index=df.index)
+    print("Step 2 (B): B1~B10 features (도메인 피처)...")
+
+    # B1, B2 : 시야각 A/B
+    feats["B1_task1_acc"] = seq_rate_simple(df["B1-1"])
+    feats["B1_rt_mean"]   = seq_mean(df["B1-2"])
+    feats["B1_rt_std"]    = seq_std(df["B1-2"])
+    feats["B1_change_acc"]    = seq_rate_B1_B2(df["B1-3"], ['1', '2'])
+    feats["B1_nonchange_acc"] = seq_rate_B1_B2(df["B1-3"], ['3', '4'])
+
+    feats["B2_task1_acc"] = seq_rate_simple(df["B2-1"])
+    feats["B2_rt_mean"]   = seq_mean(df["B2-2"])
+    feats["B2_rt_std"]    = seq_std(df["B2-2"])
+    feats["B2_change_acc"]    = seq_rate_B1_B2(df["B2-3"], ['1', '2'])
+    feats["B2_nonchange_acc"] = seq_rate_B1_B2(df["B2-3"], ['3', '4'])
+
+    # B3 (신호등 반응)
+    feats["B3_acc_rate"] = seq_rate_simple(df["B3-1"])
+    feats["B3_rt_mean"]  = seq_mean(df["B3-2"])
+    feats["B3_rt_std"]   = seq_std(df["B3-2"])
+
+    # B4 (Flanker 주의/억제)
+    feats["B4_congruent_acc"]   = seq_rate_B4(df["B4-1"], ['1', '2'])
+    feats["B4_incongruent_acc"] = seq_rate_B4(df["B4-1"], ['3', '4', '5', '6'])
+    feats["B4_rt_mean"]         = seq_mean(df["B4-2"])
+    feats["B4_rt_std"]          = seq_std(df["B4-2"])
+    # ★ NEW: congruent / incongruent RT 분리
+    feats["B4_rt_congruent"] = masked_operation(df["B4-1"], df["B4-2"], ['1','2'], 'mean')
+    feats["B4_rt_incongruent"] = masked_operation(df["B4-1"], df["B4-2"], ['3','4','5','6'], 'mean')
+
+    # B5, B6, B7, B8 (표지판/도로찾기/추적 계열)
+    feats["B5_acc_rate"] = seq_rate_simple(df["B5-1"])
+    feats["B5_rt_mean"]  = seq_mean(df["B5-2"])
+    feats["B5_rt_std"]   = seq_std(df["B5-2"])
+    feats["B6_acc_rate"] = seq_rate_simple(df["B6"])
+    feats["B7_acc_rate"] = seq_rate_simple(df["B7"])
+    feats["B8_acc_rate"] = seq_rate_simple(df["B8"])
+
+    # B9, B10 (점수형 지표, 하이픈 이름 유지)
+    feats["B9-1"] = df["B9-1"]
+    feats["B9-2"] = df["B9-2"]
+    feats["B9-3"] = df["B9-3"]
+    feats["B9-4"] = df["B9-4"]
+    feats["B9-5"] = df["B9-5"]
+
+    feats["B10-1"] = df["B10-1"]
+    feats["B10-2"] = df["B10-2"]
+    feats["B10-3"] = df["B10-3"]
+    feats["B10-4"] = df["B10-4"]
+    feats["B10-5"] = df["B10-5"]
+    feats["B10-6"] = df["B10-6"]
+
+    seq_cols = [
+        "B1-1","B1-2","B1-3",
+        "B2-1","B2-2","B2-3",
+        "B3-1","B3-2",
+        "B4-1","B4-2",
+        "B5-1","B5-2",
+        "B6","B7","B8",
+        "B9-1","B9-2","B9-3","B9-4","B9-5",
+        "B10-1","B10-2","B10-3","B10-4","B10-5","B10-6"
+    ]
+    print("B 검사 1차 전처리 완료")
+    return pd.concat([df, feats], axis=1).drop(columns=seq_cols, errors="ignore")
+
+print("\n[INFO] 1차 피처 엔지니어링 (도메인 적용) 시작...")
+train_A_features = preprocess_A(train_A_raw)
+train_B_features = preprocess_B(train_B_raw)
+
+
+## 4. 2차 Feature Engineering
+def _has(df, cols): 
+    return all(c in df.columns for c in cols)
+
+
+def _safe_div(a, b, eps=1e-6):
+    return a / (b + eps)
+
+
+def add_features_A(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    신규검사(A)용 2차 피처 엔지니어링.
+    - 시각/운동 검사(A1~A5)
+    - 인지/지각 검사(A6~A9) 요약 지표 추가
+    """
+    feats = df.copy()
+    eps = 1e-6
+
+    # (1) 검사 시점 인덱스
+    if _has(feats, ["Year", "Month"]):
+        feats["YearMonthIndex"] = feats["Year"] * 12 + feats["Month"]
+
+    # (2) 속도-정확도 trade-off (속도 예측/정지거리 계열)
+    if _has(feats, ["A1_rt_mean", "A1_acc_norm"]):
+        feats["A1_speed_acc_tradeoff"] = _safe_div(feats["A1_rt_mean"], feats["A1_acc_norm"], eps)
+    if _has(feats, ["A2_rt_mean", "A2_acc_norm"]):
+        feats["A2_speed_acc_tradeoff"] = _safe_div(feats["A2_rt_mean"], feats["A2_acc_norm"], eps)
+    if _has(feats, ["A4_rt_mean", "A4_acc_congruent"]):
+        feats["A4_speed_acc_tradeoff"] = _safe_div(feats["A4_rt_mean"], feats["A4_acc_congruent"], eps)
+
+    # (3) 반응시간 변동성(CV) - 지속주의/일관성
+    for k in ["A1", "A2", "A3", "A4"]:
+        m, s = f"{k}_rt_mean", f"{k}_rt_std"
+        if _has(feats, [m, s]):
+            feats[f"{k}_rt_cv"] = _safe_div(feats[s], feats[m], eps)
+
+    # (4) 속도-정확도 cost (속도대비 성능 저하)
+    if _has(feats, ["A1_rt_fast", "A1_rt_slow"]):
+        feats["A1_rt_speed_cost"] = feats["A1_rt_fast"] - feats["A1_rt_slow"]
+    if _has(feats, ["A1_acc_fast", "A1_acc_slow"]):
+        feats["A1_acc_speed_cost"] = feats["A1_acc_fast"] - feats["A1_acc_slow"]
+    if _has(feats, ["A2_rt_fast_c1", "A2_rt_slow_c1"]):
+        feats["A2_rt_speed_cost_c1"] = feats["A2_rt_fast_c1"] - feats["A2_rt_slow_c1"]
+    if _has(feats, ["A2_acc_fast", "A2_acc_slow"]):
+        feats["A2_acc_speed_cost"] = feats["A2_acc_fast"] - feats["A2_acc_slow"]
+
+    # (5) 크기/주의 관련 cost (주의 전환/집중 유지)
+    if _has(feats, ["A3_rt_big", "A3_rt_small"]):
+        feats["A3_rt_size_cost"] = feats["A3_rt_big"] - feats["A3_rt_small"]
+    if _has(feats, ["A3_valid_acc", "A3_invalid_acc"]):
+        # valid - invalid (클수록 선택적 주의가 좋다고 해석)
+        feats["A3_acc_attention_cost"] = feats["A3_valid_acc"] - feats["A3_invalid_acc"]
+
+    # (6) Stroop(주의 전환/억제) cost
+    if _has(feats, ["A4_rt_incongruent", "A4_rt_congruent"]):
+        feats["A4_stroop_rt_cost"] = feats["A4_rt_incongruent"] - feats["A4_rt_congruent"]
+    if _has(feats, ["A4_acc_congruent", "A4_acc_incongruent"]):
+        feats["A4_stroop_acc_cost"] = feats["A4_acc_congruent"] - feats["A4_acc_incongruent"]
+
+    # (7) 변화 탐지(작업기억/시지각) cost
+    if _has(feats, ["A5_acc_nonchange", "A5_acc_pos_change"]):
+        feats["A5_acc_cost_pos"] = feats["A5_acc_nonchange"] - feats["A5_acc_pos_change"]
+    if _has(feats, ["A5_acc_nonchange", "A5_acc_color_change"]):
+        feats["A5_acc_cost_color"] = feats["A5_acc_nonchange"] - feats["A5_acc_color_change"]
+    if _has(feats, ["A5_acc_nonchange", "A5_acc_shape_change"]):
+        feats["A5_acc_cost_shape"] = feats["A5_acc_nonchange"] - feats["A5_acc_shape_change"]
+
+    # (8) 선택적 주의 인덱스 (A3 + A4)
+    if _has(feats, ["A3_valid_acc", "A3_invalid_acc", "A4_acc_congruent", "A4_acc_incongruent"]):
+        feats["A_selective_attention_index"] = (
+            (feats["A3_valid_acc"] - feats["A3_invalid_acc"]).fillna(0) +
+            (feats["A4_acc_congruent"] - feats["A4_acc_incongruent"]).fillna(0)
+        )
+
+    # (9) 작업기억/변화탐지 인덱스 (A5 네 조건 평균)
+    wm_cols = [c for c in [
+        "A5_acc_nonchange", "A5_acc_pos_change",
+        "A5_acc_color_change", "A5_acc_shape_change"
+    ] if c in feats.columns]
+    if wm_cols:
+        wm_mat = feats[wm_cols].apply(pd.to_numeric, errors="coerce")
+        feats["A_working_memory_index"] = wm_mat.mean(axis=1)
+
+    # (10) 인지능력/지각성향 요약 (A6~A9)
+    cog_cols_A = [c for c in [
+        "A6_correct_count", "A7_correct_count",
+        "A8-1", "A8-2",
+        "A9-1", "A9-2", "A9-3", "A9-4", "A9-5"
+    ] if c in feats.columns]
+    if cog_cols_A:
+        cog_mat = feats[cog_cols_A].apply(pd.to_numeric, errors="coerce")
+        feats["A_cog_sum"] = cog_mat.sum(axis=1)
+        feats["A_cog_mean"] = cog_mat.mean(axis=1)
+
+    # (11) 종합 RiskScore (기존 + 변화탐지 가중치 조금 추가)
+    parts = []
+    if "A4_stroop_rt_cost" in feats:
+        parts.append(0.30 * feats["A4_stroop_rt_cost"].fillna(0))
+    if "A4_stroop_acc_cost" in feats:
+        parts.append(0.20 * (1 - feats["A4_stroop_acc_cost"].fillna(1)))
+    if "A3_acc_attention_cost" in feats:
+        parts.append(0.20 * feats["A3_acc_attention_cost"].fillna(0).abs())
+    if "A1_rt_cv" in feats:
+        parts.append(0.20 * feats["A1_rt_cv"].fillna(0))
+    if "A2_rt_cv" in feats:
+        parts.append(0.10 * feats["A2_rt_cv"].fillna(0))
+    # 변화 탐지 cost (실제 영상에서 '많이들 틀리는 검사'라서 약간 추가)
+    if "A5_acc_cost_pos" in feats:
+        parts.append(0.10 * feats["A5_acc_cost_pos"].fillna(0).clip(lower=0))
+    if "A5_acc_cost_color" in feats:
+        parts.append(0.10 * feats["A5_acc_cost_color"].fillna(0).clip(lower=0))
+    if "A5_acc_cost_shape" in feats:
+        parts.append(0.10 * feats["A5_acc_cost_shape"].fillna(0).clip(lower=0))
+
+    if parts:
+        # 스케일은 상관 없고, 일관된 방향성(클수록 위험)만 있으면 CatBoost가 알아서 잘 씀
+        feats["RiskScore"] = sum(parts)
+
+    feats.replace([np.inf, -np.inf], np.nan, inplace=True)
+    return feats
+
+
+def add_features_B(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    자격유지검사(B)용 2차 피처 엔지니어링.
+    - 시야각/반응속도/주의/표지판/추적/복합기능을 요약 지수로 반영
+    """
+    feats = df.copy()
+    eps = 1e-6
+
+    # (1) 검사 시점 인덱스
+    if _has(feats, ["Year", "Month"]):
+        feats["YearMonthIndex"] = feats["Year"] * 12 + feats["Month"]
+
+    # (2) 속도-정확도 trade-off (단순 반응/주의 검사들)
+    for k, acc_col, rt_col in [
+        ("B1", "B1_task1_acc", "B1_rt_mean"),
+        ("B2", "B2_task1_acc", "B2_rt_mean"),
+        ("B3", "B3_acc_rate", "B3_rt_mean"),
+        ("B5", "B5_acc_rate", "B5_rt_mean"),
+    ]:
+        if _has(feats, [rt_col, acc_col]):
+            feats[f"{k}_speed_acc_tradeoff"] = _safe_div(feats[rt_col], feats[acc_col], eps)
+
+    if _has(feats, ["B4_rt_mean", "B4_congruent_acc"]):
+        feats["B4_speed_acc_tradeoff"] = _safe_div(feats["B4_rt_mean"], feats["B4_congruent_acc"], eps)
+
+    # (3) 반응시간 변동성(CV) - 시지각/운동 일관성
+    for k in ["B1", "B2", "B3", "B4", "B5"]:
+        m, s = f"{k}_rt_mean", f"{k}_rt_std"
+        if _has(feats, [m, s]):
+            feats[f"{k}_rt_cv"] = _safe_div(feats[s], feats[m], eps)
+
+    # (4) change vs non-change accuracy / Flanker cost
+    if _has(feats, ["B1_change_acc", "B1_nonchange_acc"]):
+        feats["B1_acc_cost"] = feats["B1_nonchange_acc"] - feats["B1_change_acc"]
+    if _has(feats, ["B2_change_acc", "B2_nonchange_acc"]):
+        feats["B2_acc_cost"] = feats["B2_nonchange_acc"] - feats["B2_change_acc"]
+    if _has(feats, ["B4_congruent_acc", "B4_incongruent_acc"]):
+        feats["B4_flanker_acc_cost"] = feats["B4_congruent_acc"] - feats["B4_incongruent_acc"]
+    # ★ NEW: RT 기반 Flanker cost (incongruent - congruent, 클수록 나쁨)
+    if _has(feats, ["B4_rt_incongruent", "B4_rt_congruent"]):
+        feats["B4_flanker_rt_cost"] = feats["B4_rt_incongruent"] - feats["B4_rt_congruent"]
+
+    # (5) 시지각/운동 일관성 요약 (CV 평균)
+    rt_cv_cols = [c for c in [
+        "B1_rt_cv", "B2_rt_cv", "B3_rt_cv", "B4_rt_cv", "B5_rt_cv"
+    ] if c in feats.columns]
+    if rt_cv_cols:
+        cv_mat = feats[rt_cv_cols].apply(pd.to_numeric, errors="coerce")
+        feats["B_visuomotor_variability"] = cv_mat.mean(axis=1)
+
+    # (6) 순수 반응/신호탐지 능력 요약
+    acc_simple_cols = [c for c in [
+        "B3_acc_rate", "B5_acc_rate",
+        "B6_acc_rate", "B7_acc_rate", "B8_acc_rate"
+    ] if c in feats.columns]
+    if acc_simple_cols:
+        acc_mat = feats[acc_simple_cols].apply(pd.to_numeric, errors="coerce")
+        feats["B_reaction_overall"] = acc_mat.mean(axis=1)
+
+    # (7) 집행기능/억제 컨트롤 인덱스
+    exec_parts = []
+    if "B4_flanker_acc_cost" in feats:
+        exec_parts.append((1 - feats["B4_flanker_acc_cost"]).fillna(0))
+    for c in ["B1_acc_cost", "B2_acc_cost"]:
+        if c in feats:
+            exec_parts.append((1 - feats[c]).fillna(0))
+    if exec_parts:
+        exec_mat = pd.concat(exec_parts, axis=1)
+        feats["B_executive_control_index"] = exec_mat.mean(axis=1)
+
+    # (8) 표지판/도로찾기/추적/복합기능 요약 (B9, B10)
+    b9_cols = [c for c in ["B9-1", "B9-2", "B9-3", "B9-4", "B9-5"] if c in feats.columns]
+    if b9_cols:
+        b9_mat = feats[b9_cols].apply(pd.to_numeric, errors="coerce")
+        feats["B9_sum"] = b9_mat.sum(axis=1)
+        feats["B9_mean"] = b9_mat.mean(axis=1)
+
+    b10_cols = [c for c in ["B10-1", "B10-2", "B10-3", "B10-4", "B10-5", "B10-6"] if c in feats.columns]
+    if b10_cols:
+        b10_mat = feats[b10_cols].apply(pd.to_numeric, errors="coerce")
+        feats["B10_sum"] = b10_mat.sum(axis=1)
+        feats["B10_mean"] = b10_mat.mean(axis=1)
+
+    cog_cols_B = list(set(b9_cols + b10_cols))
+    if cog_cols_B:
+        cog_mat_B = feats[cog_cols_B].apply(pd.to_numeric, errors="coerce")
+        feats["B_cog_sum"] = cog_mat_B.sum(axis=1)
+        feats["B_cog_mean"] = cog_mat_B.mean(axis=1)
+
+    # (9) 종합 RiskScore_B (기존 + RT cost 약간 추가)
+    parts = []
+    for k in ["B4","B5"]:
+        cv_col = f"{k}_rt_cv"
+        if cv_col in feats:
+            parts.append(0.20 * feats[cv_col].fillna(0))
+    for k in ["B3","B5"]:
+        acc = f"{k}_acc_rate"
+        if acc in feats:
+            parts.append(0.20 * (1 - feats[acc].fillna(1)))
+    if "B4_flanker_acc_cost" in feats:
+        parts.append(0.20 * (1 - feats["B4_flanker_acc_cost"].fillna(1)))
+    # ★ NEW: RT cost도 약하게 반영 (0 이상만)
+    if "B4_flanker_rt_cost" in feats:
+        parts.append(0.10 * feats["B4_flanker_rt_cost"].fillna(0).clip(lower=0))
+    for k in ["B1","B2"]:
+        acc = f"{k}_task1_acc"
+        if acc in feats:
+            parts.append(0.10 * (1 - feats[acc].fillna(1)))
+        tcol = f"{k}_speed_acc_tradeoff"
+        if tcol in feats:
+            parts.append(0.10 * feats[tcol].fillna(0))
+
+    if parts:
+        feats["RiskScore_B"] = sum(parts)
+
+    feats.replace([np.inf, -np.inf], np.nan, inplace=True)
+    return feats
+
+
+print("\n[INFO] 2차 피처 엔지니어링 (도메인 적용) 시작...")
+print("[INFO] 2차 (A) 시작...")
+train_A_features = add_features_A(train_A_features)
+print("[INFO] 2차 (A) 완료.")
+print("[INFO] 2차 (B) 시작...")
+train_B_features = add_features_B(train_B_features)
+print("[INFO] 2차 (B) 완료.")
+
+
+## 5. 최종 병합 및 저장
+print("\n[INFO] 최종 피처 병합 및 Feather 파일로 저장...")
+
+meta_A = train_meta[train_meta["Test"] == "A"].reset_index(drop=True)
+meta_B = train_meta[train_meta["Test"] == "B"].reset_index(drop=True)
+
+meta_A_features = meta_A.merge(train_A_features, on="Test_id", how="left")
+meta_B_features = meta_B.merge(train_B_features, on="Test_id", how="left")
+
+print("[INFO] A, B 데이터프레임 병합 중...")
+all_train_df = pd.concat([meta_A_features, meta_B_features], sort=False).reset_index(drop=True)
+print("[INFO] 병합 완료.")
+
+FEATURE_SAVE_PATH = os.path.join(BASE_DIR, "all_train_data.feather")
+print(f"[INFO] Feather 파일 저장 중... ({FEATURE_SAVE_PATH})")
+all_train_df.to_feather(FEATURE_SAVE_PATH)
+print("[INFO] Feather 파일 저장 완료.")
+
+print("\n--- [ 1_Preprocess.ipynb ] 작업 완료 ---")
+print(f"1. {FEATURE_SAVE_PATH} (모든 피처가 포함된 학습 데이터)")
+print("이제 2_Train_Models.ipynb 노트북을 실행하세요.")
