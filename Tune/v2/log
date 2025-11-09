@@ -1,0 +1,142 @@
+[INFO] all_train_data.feather 로드 중...
+[INFO] all_train_df shape: (944767, 118)
+[INFO] StratifiedKFold 5 splits 준비 완료.
+
+[A] Trial 1/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] -> CV Combined Score = 0.14601
+[A] ★ Update best! score=0.14601, params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+
+[A] Trial 2/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] -> CV Combined Score = 0.14601
+
+[A] Trial 3/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] -> CV Combined Score = 0.14897
+
+[A] Trial 4/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] -> CV Combined Score = 0.14821
+
+[A] Trial 5/20 params={'depth': 5, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] -> CV Combined Score = 0.14781
+
+[A] Trial 6/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] -> CV Combined Score = 0.14797
+
+[A] Trial 7/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] -> CV Combined Score = 0.14672
+
+[A] Trial 8/20 params={'depth': 5, 'learning_rate': 0.03, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 1.0, 'border_count': 128}
+[A] -> CV Combined Score = 0.14700
+
+[A] Trial 9/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] -> CV Combined Score = 0.14854
+
+[A] Trial 10/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] -> CV Combined Score = 0.14731
+
+[A] Trial 11/20 params={'depth': 5, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[A] -> CV Combined Score = 0.14804
+
+[A] Trial 12/20 params={'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] -> CV Combined Score = 0.14795
+
+[A] Trial 13/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] -> CV Combined Score = 0.14814
+
+[A] Trial 14/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] -> CV Combined Score = 0.14818
+
+[A] Trial 15/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] -> CV Combined Score = 0.14814
+
+[A] Trial 16/20 params={'depth': 5, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] -> CV Combined Score = 0.14649
+
+[A] Trial 17/20 params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] -> CV Combined Score = 0.14666
+
+[A] Trial 18/20 params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] -> CV Combined Score = 0.14757
+
+[A] Trial 19/20 params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] -> CV Combined Score = 0.14630
+
+[A] Trial 20/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] -> CV Combined Score = 0.14750
+
+[A] Random Search 완료.
+[A] Best Score = 0.14601
+[A] Best Params = {'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+
+[B] Trial 1/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[B] -> CV Combined Score = 0.13741
+[B] ★ Update best! score=0.13741, params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+
+[B] Trial 2/20 params={'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13745
+
+[B] Trial 3/20 params={'depth': 3, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[B] -> CV Combined Score = 0.13619
+[B] ★ Update best! score=0.13619, params={'depth': 3, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 254}
+
+[B] Trial 4/20 params={'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13668
+
+[B] Trial 5/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13770
+
+[B] Trial 6/20 params={'depth': 5, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[B] -> CV Combined Score = 0.13606
+[B] ★ Update best! score=0.13606, params={'depth': 5, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 254}
+
+[B] Trial 7/20 params={'depth': 5, 'learning_rate': 0.03, 'l2_leaf_reg': 10, 'random_strength': 3.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13609
+
+[B] Trial 8/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[B] -> CV Combined Score = 0.13607
+
+[B] Trial 9/20 params={'depth': 3, 'learning_rate': 0.05, 'l2_leaf_reg': 3, 'random_strength': 3.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[B] -> CV Combined Score = 0.13614
+
+[B] Trial 10/20 params={'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 254}
+[B] -> CV Combined Score = 0.13692
+
+[B] Trial 11/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13597
+[B] ★ Update best! score=0.13597, params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+
+[B] Trial 12/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[B] -> CV Combined Score = 0.13780
+
+[B] Trial 13/20 params={'depth': 5, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13633
+
+[B] Trial 14/20 params={'depth': 3, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 3.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13574
+[B] ★ Update best! score=0.13574, params={'depth': 3, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 3.0, 'bagging_temperature': 1.0, 'border_count': 128}
+
+[B] Trial 15/20 params={'depth': 3, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[B] -> CV Combined Score = 0.13619
+
+[B] Trial 16/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[B] -> CV Combined Score = 0.13715
+
+[B] Trial 17/20 params={'depth': 3, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[B] -> CV Combined Score = 0.13691
+
+[B] Trial 18/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[B] -> CV Combined Score = 0.13633
+
+[B] Trial 19/20 params={'depth': 3, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[B] -> CV Combined Score = 0.13671
+
+[B] Trial 20/20 params={'depth': 3, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 3.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[B] -> CV Combined Score = 0.13627
+
+[B] Random Search 완료.
+[B] Best Score = 0.13574
+[B] Best Params = {'depth': 3, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 3.0, 'bagging_temperature': 1.0, 'border_count': 128}
+
+================ 최종 결과 요약 ================
+A-model best params: {'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}   CV score: 0.14601336936973
+B-model best params: {'depth': 3, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 3.0, 'bagging_temperature': 1.0, 'border_count': 128}   CV score: 0.13574200225654662
+→ 2_Train_Models_v15.ipynb 의 BEST_A_PARAMS / BEST_B_PARAMS 에 이 값들을 넣어주면 됨.
