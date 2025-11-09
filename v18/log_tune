@@ -1,0 +1,149 @@
+Big-Tech ML Engineer v18 Hyperparam Search: 시작.
+[INFO] all_train_data.feather 로드 중...
+[INFO] all_train_df shape: (944767, 113)
+
+[INFO] StratifiedKFold 5 splits 준비 중...
+[INFO] StratifiedKFold 5 splits 준비 완료.
+
+================ A 모델 Random Search 시작 ================
+[INFO] 후보 조합 수: 486, 실제 실행 trial: 20
+
+[A] Trial 1/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7160, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14724
+[A] -> CV Combined Score = 0.14724
+[A] ★ Update best! score=0.14724, params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 1.0, 'border_count': 128}
+
+[A] Trial 2/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7175, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14647
+[A] -> CV Combined Score = 0.14647
+[A] ★ Update best! score=0.14647, params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+
+[A] Trial 3/20 params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7222, Brier: 0.0204, ECE: 0.0004
+  Combined Score: 0.14410
+[A] -> CV Combined Score = 0.14410
+[A] ★ Update best! score=0.14410, params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 254}
+
+[A] Trial 4/20 params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7192, Brier: 0.0204, ECE: 0.0006
+  Combined Score: 0.14562
+[A] -> CV Combined Score = 0.14562
+
+[A] Trial 5/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 2.0, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7164, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14704
+[A] -> CV Combined Score = 0.14704
+
+[A] Trial 6/20 params={'depth': 5, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] CatBoost params: {'depth': 5, 'learning_rate': 0.07, 'l2_leaf_reg': 3, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7196, Brier: 0.0204, ECE: 0.0006
+  Combined Score: 0.14546
+[A] -> CV Combined Score = 0.14546
+
+[A] Trial 7/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] CatBoost params: {'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7207, Brier: 0.0204, ECE: 0.0004
+  Combined Score: 0.14486
+[A] -> CV Combined Score = 0.14486
+
+[A] Trial 8/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7223, Brier: 0.0204, ECE: 0.0005
+  Combined Score: 0.14407
+[A] -> CV Combined Score = 0.14407
+[A] ★ Update best! score=0.14407, params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+
+[A] Trial 9/20 params={'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] CatBoost params: {'depth': 5, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7205, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14498
+[A] -> CV Combined Score = 0.14498
+
+[A] Trial 10/20 params={'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7221, Brier: 0.0204, ECE: 0.0004
+  Combined Score: 0.14417
+[A] -> CV Combined Score = 0.14417
+
+[A] Trial 11/20 params={'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7217, Brier: 0.0204, ECE: 0.0008
+  Combined Score: 0.14442
+[A] -> CV Combined Score = 0.14442
+
+[A] Trial 12/20 params={'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7180, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14624
+[A] -> CV Combined Score = 0.14624
+
+[A] Trial 13/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 5, 'random_strength': 2.0, 'bagging_temperature': 0.3, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7160, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14724
+[A] -> CV Combined Score = 0.14724
+
+[A] Trial 14/20 params={'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.03, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7217, Brier: 0.0204, ECE: 0.0005
+  Combined Score: 0.14438
+[A] -> CV Combined Score = 0.14438
+
+[A] Trial 15/20 params={'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.05, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7180, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14623
+[A] -> CV Combined Score = 0.14623
+
+[A] Trial 16/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 0.5, 'bagging_temperature': 0.5, 'border_count': 128}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7178, Brier: 0.0203, ECE: 0.0005
+  Combined Score: 0.14630
+[A] -> CV Combined Score = 0.14630
+
+[A] Trial 17/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 0.5, 'bagging_temperature': 0.3, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7219, Brier: 0.0204, ECE: 0.0005
+  Combined Score: 0.14424
+[A] -> CV Combined Score = 0.14424
+
+[A] Trial 18/20 params={'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] CatBoost params: {'depth': 6, 'learning_rate': 0.07, 'l2_leaf_reg': 5, 'random_strength': 1.0, 'bagging_temperature': 0.5, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7219, Brier: 0.0203, ECE: 0.0006
+  Combined Score: 0.14429
+[A] -> CV Combined Score = 0.14429
+
+[A] Trial 19/20 params={'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.07, 'l2_leaf_reg': 10, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] 전체 Fold OOF 기준 Combined Score:
+  AUC: 0.7165, Brier: 0.0204, ECE: 0.0005
+  Combined Score: 0.14698
+[A] -> CV Combined Score = 0.14698
+
+[A] Trial 20/20 params={'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
+[A] CatBoost params: {'depth': 4, 'learning_rate': 0.03, 'l2_leaf_reg': 3, 'random_strength': 1.0, 'bagging_temperature': 1.0, 'border_count': 254}
