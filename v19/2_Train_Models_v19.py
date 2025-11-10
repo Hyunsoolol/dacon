@@ -17,7 +17,7 @@ import joblib
 import warnings
 warnings.filterwarnings('ignore')
 
-print("Big-Tech ML Engineer (v18+Delta+log_ratio): K-Fold + Leakage Fix + Domain Features 시작.")
+print("Big-Tech ML Engineer (v19): K-Fold + Leakage Fix + Domain Features 시작.")
 
 ## 0. Hyperparameter 설정
 BEST_A_PARAMS = {
@@ -331,4 +331,4 @@ else:
 
 print("\n[INFO] '최종 보정' CatBoost 모델 10개 및 최종 PK 통계 피처 저장 완료:")
 print(f"  - PK Stats: {final_pk_stats_path}")
-print("Big-Tech ML Engineer (v18+Delta+log_ratio): 미션 완료.")
+print("Big-Tech ML Engineer (v19): 미션 완료.")
