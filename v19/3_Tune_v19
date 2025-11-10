@@ -36,7 +36,8 @@ N_SPLITS = 5
 RANDOM_STATE = 42
 
 # 튜닝에 사용할 폴드
-FOLDS_FOR_TUNING = [0, 1, 2, 3, 4]
+#FOLDS_FOR_TUNING = [0, 1, 2, 3, 4]
+FOLDS_FOR_TUNING = [0, 1, 2] # 3개 폴드만 사용해서 튜닝
 
 CAT_FEATURES = ["Age", "PrimaryKey"]
 DROP_COLS_TRAIN = [
