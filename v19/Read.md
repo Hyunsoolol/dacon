@@ -307,6 +307,8 @@ v19에서 새로 추가된 핵심 변화입니다.
 FEATURE_SAVE_PATH = "./data/all_train_data.feather"
 all_train_df = pd.read_feather(FEATURE_SAVE_PATH)
 all_train_df['Label'] = all_train_df['Label'].fillna(0)
+```
+
 * A/B가 통합된 단일 테이블에서 학습합니다.
 
 ### 4.2 평가 지표 & Combined Score
@@ -343,6 +345,7 @@ DROP_COLS_TRAIN = [
     'Test_id', 'Test_x', 'Test_y', 'Label',
     'TestDate', 'Year', 'Month', 'base_index',
 ]
+```
 * 범주형 피처:
     * Age: 문자열로 캐스팅해서 CatBoost category로 사용
     * PrimaryKey: 사람 ID, 개인 특성을 캡처하는 카테고리 피처
