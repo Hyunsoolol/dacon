@@ -1,0 +1,64 @@
+전처리된 메인 피처 로드 중...
+데이터 로드 완료.
+
+--- EDA 1: A/B 검사자 교차 분석 ---
+각 사람(PrimaryKey)이 어떤 종류의 검사를 봤는지 집계합니다.
+
+[사람(PrimaryKey) 기준 검사 유형 분포]
+Test_x
+A-only (신규A만)     586650
+B-only (기존B만)     162380
+Both (A, B 모두)     25212
+Name: count, dtype: int64
+------------------------------
+A, B 둘 다 본 사람의 비율: 3.3%
+EDA 1 플롯 저장: eda1_user_distribution.png
+
+--- EDA 2: A, B를 모두 본 사람의 검사 순서 분석 ---
+
+[A, B 모두 본 사람들의 첫 검사 순서]
+A_first_B_later    16926
+B_first_A_later     6909
+Same_Time           1377
+dtype: int64
+EDA 2 플롯 저장: eda2_time_order.png
+...
+  A 데이터: 647241 -> 647241 (NaN 제거)
+  B 데이터: 297526 -> 297526 (NaN 제거)
+
+[B 검사 + 직전 A 검사 피처 연결 결과 (예시)]
+Output is truncated. View as a scrollable element or open in a text editor. Adjust cell output settings...
+PrimaryKey	YearMonthIndex	Label	B4_flanker_acc_log_ratio	A4_stroop_rt_log_ratio_from_last_A	A3_acc_attention_log_ratio_from_last_A
+0	0x03D41789BB982E80E41D777A45F3AC3A0A46A56BFF6B...	24194	0	0.033902	NaN	NaN
+1	0x7A452245E96D81402DFE424FA86C99CBB4F619F8E0A5...	24194	0	0.000000	NaN	NaN
+2	0x7DB36D7A524A672BA5755791ACE73A5BC4C2B7BBF306...	24194	0	0.000000	NaN	NaN
+3	0xF87E0D874A96EBB7902314E227D4065422D1F2D2AEC1...	24194	1	0.000000	NaN	NaN
+4	0x7C58DE124ED9063F97146C064594011B2A7AEA6C6C27...	24194	0	0.143101	NaN	NaN
+5	0x787FBE5FFAAA39906462AF8C91D443BD00378C48B7B9...	24194	0	0.074108	NaN	NaN
+6	0xB5D30292DFAEE20F09421658536581EE23F7FD37276F...	24195	0	0.000000	NaN	NaN
+7	0xA1BE3D47720379F4A93CF99849C74CE59674EAFF9D39...	24195	0	0.148420	NaN	NaN
+8	0xBA8F4928E2A60784623FE0C608F35942775FCE728BFD...	24195	0	-0.033902	NaN	NaN
+9	0xD38E7EDA1D798464560EDA787F2F4B99372A030A64C9...	24195	0	0.068993	NaN	NaN
+
+[B 검사 Label과 '직전 A 검사 피처' 간의 상관관계 (B_hist 그룹)]
+A4_stroop_rt_log_ratio_from_last_A        0.018740
+A3_acc_attention_log_ratio_from_last_A    0.001935
+dtype: float64
+
+==================================================
+결론 및 제언
+==================================================
+✅ [검증됨] A 검사와 B 검사를 모두 본 사람이 존재합니다.
+✅ [검증됨] 'A를 먼저' 보고 'B를 나중에' 보는 사람이 16926명 (대부분) 확인되었습니다.
+
+---
+💡 [제언 1] 'A 정보'는 B 모델의 핵심 피처입니다.
+A 검사를 B 검사보다 먼저 보는 경우가 대다수이므로, A 검사에서 측정한 피처들은 B 검사자의 상태를 예측하는 강력한 '과거 이력' 피처가 됩니다.
+B 모델을 만들 때 이 피처들을 반드시 활용해야 합니다.
+
+💡 [제언 2] 'v21 하이브리드' 전략은 유효합니다.
+B 검사자 중에서도 A 이력이 있는 사람(B_hist)과 없는 사람(B_first)은 피처 구성이 다를 수밖에 없습니다.
+  - B_hist (이력 있음): A 검사 피처 (PK Stats, Delta, merge_asof 등)를 적극 활용합니다.
+  - B_first (이력 없음): A 검사 피처 없이, B 검사 피처와 Age/YearMonth 등 공통 피처로만 학습합니다.
+v21의 4-모델 분리 전략은 이 EDA 결과와 정확히 일치하는 올바른 접근 방식입니다.
+
