@@ -1,0 +1,228 @@
+Big-Tech ML Engineer (v20 시작.)
+[INFO] CatBoost task_type=CPU, devices=0
+전처리된 메인 피처 로드 중...
+데이터 로드 완료.
+
+[INFO] K-Fold 교차 검증 분리 시작...
+5-Fold 분리 완료.
+
+=== Fold 1/5 학습 시작 ===
+
+[Fold 1] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (PK Stats 미사용, Delta 제외, log_ratio 포함) 학습 ---
+
+[A] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 105개)
+0:	test: 0.6779548	best: 0.6779548 (0)	total: 649ms	remaining: 32m 27s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7262929671
+bestIteration = 276
+
+Shrink model to first 277 iterations.
+
+[A] 단독 확률 보정 (Isotonic) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.7263, Brier: 0.1878, ECE: 0.3906
+  Combined Score: 0.28144
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.7287, Brier: 0.0205, ECE: 0.0000
+  Combined Score: 0.14078
+
+--- 모델 B (PK Stats + Delta + log_ratio, tuned) 학습 ---
+
+[B] Delta 사용 열 수: 36
+[B] CatBoost (Base+PK+Hist+Norm+Delta+log_ratio) 학습 시작... (피처 150개)
+0:	test: 0.6228358	best: 0.6228358 (0)	total: 164ms	remaining: 8m 10s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7668888546
+bestIteration = 702
+
+Shrink model to first 703 iterations.
+
+[B] 단독 확률 보정 (Isotonic) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.7669, Brier: 0.1760, ECE: 0.3589
+  Combined Score: 0.25028
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.7696, Brier: 0.0368, ECE: 0.0000
+  Combined Score: 0.12441
+
+=== Fold 2/5 학습 시작 ===
+
+[Fold 2] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (PK Stats 미사용, Delta 제외, log_ratio 포함) 학습 ---
+
+[A] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 105개)
+0:	test: 0.6686775	best: 0.6686775 (0)	total: 1s	remaining: 50m 7s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7242406106
+bestIteration = 201
+
+Shrink model to first 202 iterations.
+
+[A] 단독 확률 보정 (Isotonic) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.7242, Brier: 0.1910, ECE: 0.3959
+  Combined Score: 0.28461
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.7265, Brier: 0.0206, ECE: 0.0000
+  Combined Score: 0.14187
+
+--- 모델 B (PK Stats + Delta + log_ratio, tuned) 학습 ---
+
+[B] Delta 사용 열 수: 36
+[B] CatBoost (Base+PK+Hist+Norm+Delta+log_ratio) 학습 시작... (피처 150개)
+0:	test: 0.6271217	best: 0.6271217 (0)	total: 157ms	remaining: 7m 49s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7554862535
+bestIteration = 583
+
+Shrink model to first 584 iterations.
+
+[B] 단독 확률 보정 (Isotonic) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.7555, Brier: 0.1751, ECE: 0.3573
+  Combined Score: 0.25534
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.7578, Brier: 0.0369, ECE: 0.0000
+  Combined Score: 0.13029
+
+=== Fold 3/5 학습 시작 ===
+
+[Fold 3] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (PK Stats 미사용, Delta 제외, log_ratio 포함) 학습 ---
+
+[A] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 105개)
+0:	test: 0.6792442	best: 0.6792442 (0)	total: 595ms	remaining: 29m 45s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7313904687
+bestIteration = 262
+
+Shrink model to first 263 iterations.
+
+[A] 단독 확률 보정 (Isotonic) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.7314, Brier: 0.1903, ECE: 0.3940
+  Combined Score: 0.28038
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.7335, Brier: 0.0206, ECE: 0.0000
+  Combined Score: 0.13841
+
+--- 모델 B (PK Stats + Delta + log_ratio, tuned) 학습 ---
+
+[B] Delta 사용 열 수: 36
+[B] CatBoost (Base+PK+Hist+Norm+Delta+log_ratio) 학습 시작... (피처 150개)
+0:	test: 0.6164605	best: 0.6164605 (0)	total: 155ms	remaining: 7m 43s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7578423473
+bestIteration = 642
+
+Shrink model to first 643 iterations.
+
+[B] 단독 확률 보정 (Isotonic) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.7578, Brier: 0.1726, ECE: 0.3539
+  Combined Score: 0.25270
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.7600, Brier: 0.0366, ECE: 0.0000
+  Combined Score: 0.12914
+
+=== Fold 4/5 학습 시작 ===
+
+[Fold 4] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (PK Stats 미사용, Delta 제외, log_ratio 포함) 학습 ---
+
+[A] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 105개)
+0:	test: 0.6760121	best: 0.6760121 (0)	total: 602ms	remaining: 30m 6s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7178507892
+bestIteration = 177
+
+Shrink model to first 178 iterations.
+
+[A] 단독 확률 보정 (Isotonic) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.7179, Brier: 0.1908, ECE: 0.3947
+  Combined Score: 0.28744
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.7197, Brier: 0.0211, ECE: 0.0000
+  Combined Score: 0.14542
+
+--- 모델 B (PK Stats + Delta + log_ratio, tuned) 학습 ---
+
+[B] Delta 사용 열 수: 36
+[B] CatBoost (Base+PK+Hist+Norm+Delta+log_ratio) 학습 시작... (피처 150개)
+0:	test: 0.6320009	best: 0.6320009 (0)	total: 160ms	remaining: 8m
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7736334539
+bestIteration = 647
+
+Shrink model to first 648 iterations.
+
+[B] 단독 확률 보정 (Isotonic) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.7736, Brier: 0.1799, ECE: 0.3660
+  Combined Score: 0.24967
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.7760, Brier: 0.0358, ECE: 0.0000
+  Combined Score: 0.12097
+
+=== Fold 5/5 학습 시작 ===
+
+[Fold 5] K-Fold Target Encoding (PK Stats) 생성...
+
+--- 모델 A (PK Stats 미사용, Delta 제외, log_ratio 포함) 학습 ---
+
+[A] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 105개)
+0:	test: 0.6787806	best: 0.6787806 (0)	total: 636ms	remaining: 31m 47s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7283380705
+bestIteration = 237
+
+Shrink model to first 238 iterations.
+
+[A] 단독 확률 보정 (Isotonic) 시작...
+[A] 비보정 단독 점수:
+  AUC: 0.7283, Brier: 0.1906, ECE: 0.3951
+  Combined Score: 0.28225
+[A] ★보정된 단독★ 최종 점수:
+  AUC: 0.7303, Brier: 0.0206, ECE: 0.0000
+  Combined Score: 0.14001
+
+--- 모델 B (PK Stats + Delta + log_ratio, tuned) 학습 ---
+
+[B] Delta 사용 열 수: 36
+[B] CatBoost (Base+PK+Hist+Norm+Delta+log_ratio) 학습 시작... (피처 150개)
+0:	test: 0.6143611	best: 0.6143611 (0)	total: 164ms	remaining: 8m 10s
+Stopped by overfitting detector  (100 iterations wait)
+
+bestTest = 0.7589167408
+bestIteration = 717
+
+Shrink model to first 718 iterations.
+
+[B] 단독 확률 보정 (Isotonic) 시작...
+[B] 비보정 단독 점수:
+  AUC: 0.7589, Brier: 0.1776, ECE: 0.3594
+  Combined Score: 0.25479
+[B] ★보정된 단독★ 최종 점수:
+  AUC: 0.7608, Brier: 0.0367, ECE: 0.0000
+  Combined Score: 0.12878
+
+[INFO] K-Fold PK Stats 병합...
+
+[INFO] '최종 보정' CatBoost 모델 10개 및 최종 PK 통계 피처 저장 완료:
+  - PK Stats: ./model\pk_stats_final.csv
+Big-Tech ML Engineer (v20): 미션 완료.
