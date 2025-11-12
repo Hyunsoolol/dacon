@@ -249,23 +249,11 @@ for fold in range(N_SPLITS):
     # --- PK Stats: train_df_fold에서만 생성 (Leakage 방지) ---
     print(f"\n[Fold {fold+1}] K-Fold Target Encoding (PK Stats) 생성...")
     agg_funcs = {
-        'Age_num': ['mean', 'min', 'max'],
-        'YearMonthIndex': ['mean', 'std', 'min', 'max'],
-        'A1_rt_mean': ['mean', 'std'],
-        'A4_acc_congruent': ['mean', 'std'],
-        'A4_acc_incongruent': ['mean', 'std'],
-        # cost → log_ratio
-        'A4_stroop_rt_log_ratio': ['mean', 'std'],
-        'RiskScore': ['mean', 'std', 'max'],
-        'B1_change_acc': ['mean', 'std'],
-        'B1_nonchange_acc': ['mean', 'std'],
-        'B3_rt_mean': ['mean', 'std'],
-        # cost → log_ratio
-        'B4_flanker_acc_log_ratio': ['mean', 'std'],
-        'B4_rt_mean': ['mean', 'std'],
-        'RiskScore_B': ['mean', 'std', 'max'],
-        'Test_id': ['count']
-    }
+       'B3_rt_mean': ['mean', 'std'],
+       'B1_acc_log_ratio': ['mean', 'std'],
+       'B2_acc_log_ratio': ['mean', 'std'],
+       'Test_id': ['count'],
+   }
     valid_agg_funcs = {col: funcs for col, funcs in agg_funcs.items() if col in train_df_fold.columns}
 
     pk_stats_fold = train_df_fold.groupby('PrimaryKey').agg(valid_agg_funcs)
