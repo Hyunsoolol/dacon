@@ -1,3 +1,14 @@
+============[수정사항]============
+GPU 토글 추가: CAT_TASK_TYPE, CAT_DEVICES 환경변수로 GPU/CPU 전환 → 두 모델(A/B) 모두 task_type=CAT_TASK_TYPE, devices=CAT_DEVICES.
+
+클래스 불균형 자동 가중: auto_class_weights='Balanced' 적용(양성 희소 시 AUC/ECE 안정에 도움).
+
+컬럼 순서 보존: _build_cb_matrices에서 공통 수치 피처를 원본 순서 유지로 선택.
+
+카테고리 처리 일관화: Age, PrimaryKey를 train/val 모두 fillna('nan').astype(str).
+
+PK 통계 집계 안전화: groupby(...).mean(numeric_only=True)로 경고/혼합형 이슈 회피.
+================================================================================================================================================
 Big-Tech ML Engineer (v20 시작).
 [INFO] CatBoost task_type=CPU, devices=0
 [INFO] Binning(A): {'border_count': 128, 'max_bin': None}
