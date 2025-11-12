@@ -1,6 +1,5 @@
-
 ## ---------------------------------------------------------------- ##
-# [Jupyter용] 1_Preprocess_v20.py
+# [Jupyter용] 1_Preprocess_delta_logratio.py
 ## - v18 베이스
 ## - 전략 2: PK 히스토리 피처
 ## - 전략 3: Age/YearMonthIndex 정규화 점수
@@ -18,7 +17,7 @@ import joblib
 tqdm.pandas()
 warnings.filterwarnings('ignore')
 
-print("데이터 전처리 파이프라인 시작 (v20)...")
+print("데이터 전처리 파이프라인 시작 (v18 + Delta(B-only) + log_ratio)...")
 
 ## 1. 로컬 경로 설정 및 데이터 로드
 BASE_DIR = "./data"
@@ -498,4 +497,4 @@ print("[INFO] Feather 파일 저장 완료.")
 print("\n--- [ 1_Preprocess_delta_logratio.py ] 작업 완료 ---")
 print(f"1. {FEATURE_SAVE_PATH} (모든 피처 + Delta + log_ratio 포함 학습 데이터)")
 print(f"2. {norm_path} (Age/YearMonthIndex 정규화 통계)")
-print("이제 2_Train_Models_v20.py를 실행하세요.")
+print("이제 2_Train_Models_v18_delta_logratio.py를 실행하세요.")
