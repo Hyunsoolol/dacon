@@ -1,10 +1,10 @@
-
 ## ----------------------------------------------------------------
-## [Jupyter용] 2_Train_Models_v20.py
+## [Jupyter용] 2_Train_Models_v20.py (GPU 수정 버전)
 ##  - v18 구조 유지
 ##    * A: Base + Hist + Norm (PK Stats 미사용, Delta는 명시적으로 제외)
 ##    * B: Base + PK + Hist + Norm + Delta(B-only)
 ##  - [변경] *_cost → *_log_ratio 기반 PK Stats 사용
+##  - [GPU] task_type="GPU"로 변경
 ## ----------------------------------------------------------------
 import os
 import numpy as np
@@ -19,7 +19,7 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-print("Big-Tech ML Engineer (v20 시작.")
+print("Big-Tech ML Engineer (v20): K-Fold + Leakage Fix + Domain Features 시작.")
 
 ## 0. Hyperparameter 설정
 BEST_A_PARAMS = {
@@ -159,10 +159,12 @@ def train_model_A(X_train, y_train, X_val, y_val, group_label="A"):
     print(f"\n[{group_label}] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 {len(cb_X_train.columns)}개)")
     cat_base_model = cb.CatBoostClassifier(
         iterations=3000,
+        task_type="GPU",          # [GPU] 수정
+        devices='0',              # [GPU] 수정 (0번 GPU 사용)
         loss_function='Logloss',
         eval_metric='AUC',
         random_seed=42,
-        thread_count=-1,
+        # thread_count=-1,        # [GPU] CPU 스레드 설정 제거
         early_stopping_rounds=100,
         verbose=1000,
         **BEST_A_PARAMS,
@@ -205,10 +207,12 @@ def train_model_B(X_train, y_train, X_val, y_val, pk_stats_fold, group_label="B"
     print(f"[{group_label}] CatBoost (Base+PK+Hist+Norm+Delta+log_ratio) 학습 시작... (피처 {len(cb_X_train.columns)}개)")
     cat_base_model = cb.CatBoostClassifier(
         iterations=3000,
+        task_type="GPU",          # [GPU] 수정
+        devices='0',              # [GPU] 수정 (0번 GPU 사용)
         loss_function='Logloss',
         eval_metric='AUC',
         random_seed=42,
-        thread_count=-1,
+        # thread_count=-1,        # [GPU] CPU 스레드 설정 제거
         early_stopping_rounds=100,
         verbose=1000,
         **BEST_B_PARAMS,
@@ -253,7 +257,7 @@ for fold in range(N_SPLITS):
        'B1_acc_log_ratio': ['mean', 'std'],
        'B2_acc_log_ratio': ['mean', 'std'],
        'Test_id': ['count'],
-   }
+    }
     valid_agg_funcs = {col: funcs for col, funcs in agg_funcs.items() if col in train_df_fold.columns}
 
     pk_stats_fold = train_df_fold.groupby('PrimaryKey').agg(valid_agg_funcs)
