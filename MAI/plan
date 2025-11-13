@@ -125,6 +125,808 @@ Nucleotide Transformer (NT) (InstaDeep, 2023, HuggingFace 공개)
 이미 많은 VEP 벤치마크 코드가 정리돼 있음.
 
 
+---
+4-1. 규칙 + 하드웨어 + 성능을 모두 고려한 결론
+
+규칙상: NT (CC-BY-NC-SA)는 애매하거나 불가, HyenaDNA는 OK.
+
+4GB VRAM: NT는 사실상 CPU-only, HyenaDNA tiny/small은 GPU fine-tuning 가능.
+
+성능: HyenaDNA도 NT 벤치마크에서 SOTA 다수, variant-sensitive representation에 충분히 강함.
+
+👉 그래서 네 환경과 대회 규칙을 모두 반영하면:
+
+메인 gLM으로는 HyenaDNA (특히 hyenadna-tiny-1k 또는 hyenadna-tiny-1k-d256)를 GPU에서 fine-tune 하는 전략을 추천할게.
+
+너의 4GB 1050 Ti + 64GB RAM + “상업적 이용 허용 라이선스” 규칙 조합이면
+→ HyenaDNA 계열(특히 tiny-1k(-d256))을 GPU에서 fine-tuning하는 게 가장 합리적인 메인 선택이고,
 
 
+---
+0. 전체 파이프라인 개요
+핵심 아이디어 (최근 논문들 기반)
+
+HyenaDNA는 단일 뉴클레오타이드 토큰 + 긴 컨텍스트 모델로, chromatin 특징 예측과 variant prioritization에서 강한 성능을 보임.
+
+StartCLR, start loss variant 논문들은 HyenaDNA 임베딩으로 변이 부근 1kb 서열을 인코딩하고,
+self-supervised / contrastive learning으로 병적 vs 양성 변이 구분 성능을 크게 올림.
+
+DNABERT-S, DNASimCLR, LLMED 같은 최근 gLM 연구들은
+“1 − cosine similarity”를 distance로 두고, contrastive loss를 통해 “edit distance / 변이 수” 정보가 임베딩 공간에 반영되도록 학습하면,
+변이 민감도와 downstream 성능이 올라간다고 보고함.
+
+→ 따라서 우리도:
+
+외부 변이 데이터에서 (ref, variant) 쌍 + pathogenic/benign 라벨 + 변이 개수를 만들고,
+
+HyenaDNA-tiny(1k, d256)를 backbone으로 한 contrastive head를 붙여서
+
+병적 변이는 ref에서 멀어지고, benign는 ref에 가깝도록 (CDD↑)
+
+변이 개수가 많을수록 distance가 커지도록 (PCC↑)
+
+전반적으로 ref-variant distance 자체가 충분히 커지도록 (CD↑)
+
+이 구조를 external validation에서 CD/CDD/PCC proxy 지표로 튜닝한 뒤,
+
+최종 모델로 Dacon test.csv 전체에 임베딩을 찍어서 제출.
+
+이 흐름으로 갈 거야.
+
+1. 폴더 구조 설계
+
+프로젝트 루트 예시:
+
+mai_hyenadna/
+├─ data/
+│  ├─ dacon/
+│  │  ├─ test.csv
+│  │  └─ sample_submission.csv
+│  ├─ external_raw/
+│  │  ├─ clinvar.vcf.gz
+│  │  ├─ reference.fa
+│  │  └─ ... (BEND 등)
+│  └─ external_processed/
+│     ├─ variant_pairs.parquet      # (ref/variant 쌍, meta)
+│     └─ synthetic_multi_mut.parquet
+├─ models/
+│  ├─ hyenadna_base/                # HF에서 다운받은 pretrain
+│  └─ hyenadna_finetuned/           # 우리가 fine-tune한 체크포인트
+├─ src/
+│  ├─ config.py
+│  ├─ prepare_variant_dataset.py
+│  ├─ dataset.py
+│  ├─ model_hyenadna.py
+│  ├─ train_contrastive.py
+│  ├─ eval_metrics.py
+│  └─ infer_and_submit.py
+├─ output/
+│  ├─ logs/
+│  ├─ checkpoints/
+│  ├─ val_metrics.csv
+│  └─ submissions/
+│     └─ submission_YYYYMMDD_desc.csv
+└─ requirements.txt
+
+2. requirements.txt (core)
+torch==2.2.0
+transformers>=4.39.0
+datasets
+pandas
+numpy
+scikit-learn
+pyarrow
+tqdm
+biopython
+
+
+HyenaDNA HF 포트는 LongSafari/hyenadna-*-hf 같이 HuggingFace AutoModel로 바로 사용 가능하도록 되어 있음.
+
+3. Step 1 – 외부 변이 데이터 준비 (ClinVar 등 → variant_pairs)
+3-1. 우리가 만들 타깃 테이블 구조
+
+data/external_processed/variant_pairs.parquet:
+
+컬럼	설명
+ref_id	reference 서열 ID (key)
+var_id	variant ID (unique)
+seq_ref	ref 서열 (A/C/G/T/N, 길이≈1001bp)
+seq_var	변이 적용된 alt 서열
+patho	1=Pathogenic/Likely_pathogenic, 0=Benign/Likely_benign
+n_mut	ref와 alt 사이의 다른 염기 개수 (SNV=1, multi=2,3,...)
+source	ClinVar, BEND, etc
+
+실제 ClinVar VCF → FASTA window 추출은 pysam/biopython 섞어서 해야 해서, 여기선 구조와 골격 코드만 잡아줄게.
+
+3-2. 준비용 스크립트 골격 src/prepare_variant_dataset.py
+# src/prepare_variant_dataset.py
+import os
+import pandas as pd
+from tqdm import tqdm
+from Bio import SeqIO
+
+DATA_DIR = "./data"
+RAW_DIR = os.path.join(DATA_DIR, "external_raw")
+OUT_DIR = os.path.join(DATA_DIR, "external_processed")
+os.makedirs(OUT_DIR, exist_ok=True)
+
+WINDOW = 500  # 변이 주변 ±500bp → 총 1001bp
+
+def load_reference_fasta(fa_path):
+    ref_dict = {}
+    for rec in SeqIO.parse(fa_path, "fasta"):
+        ref_dict[rec.id] = str(rec.seq).upper()
+    return ref_dict
+
+def extract_window(ref_seq, pos, window=WINDOW):
+    start = max(0, pos - window)
+    end = min(len(ref_seq), pos + window + 1)
+    seq = ref_seq[start:end]
+    # 길이 고정 (pad with N)
+    if len(seq) < 2 * window + 1:
+        pad_left = window - (pos - start)
+        pad_right = 2 * window + 1 - len(seq) - pad_left
+        seq = "N" * pad_left + seq + "N" * pad_right
+    return seq
+
+def apply_variant(seq_ref, rel_pos, ref_allele, alt_allele):
+    # rel_pos: window 내 index
+    assert seq_ref[rel_pos:rel_pos+len(ref_allele)] == ref_allele
+    return (
+        seq_ref[:rel_pos] +
+        alt_allele +
+        seq_ref[rel_pos+len(ref_allele):]
+    )
+
+def main():
+    # 1) ClinVar VCF 파싱 → (chrom, pos, ref, alt, patho_label)
+    #    이 부분은 라이브러리/포맷에 따라 구현
+    clinvar_df = pd.read_parquet(
+        os.path.join(RAW_DIR, "clinvar_parsed.parquet")
+    )
+
+    ref_fa = os.path.join(RAW_DIR, "GRCh38.fa")
+    ref_dict = load_reference_fasta(ref_fa)
+
+    rows = []
+    for i, row in tqdm(clinvar_df.iterrows(), total=len(clinvar_df)):
+        chrom = row["chrom"]
+        pos = int(row["pos"]) - 1  # 0-based
+        ref_allele = row["ref"].upper()
+        alt_allele = row["alt"].upper()
+        patho = int(row["is_pathogenic"])
+        ref_seq_full = ref_dict[chrom]
+
+        seq_ref = extract_window(ref_seq_full, pos, WINDOW)
+        rel_pos = WINDOW  # 중앙에 위치시키는 설정
+
+        # ref_allele 길이가 1보다 클 수도 있으므로 확인
+        seq_var = apply_variant(seq_ref, rel_pos, ref_allele, alt_allele)
+
+        # n_mut = edit distance 근사 (간단히 len(alt_allele) or 실제 diff count)
+        n_mut = max(len(ref_allele), len(alt_allele))
+
+        rows.append({
+            "ref_id": f"{chrom}:{pos}",
+            "var_id": f"{chrom}:{pos}:{ref_allele}>{alt_allele}",
+            "seq_ref": seq_ref,
+            "seq_var": seq_var,
+            "patho": patho,
+            "n_mut": n_mut,
+            "source": "clinvar",
+        })
+
+    out_df = pd.DataFrame(rows)
+    out_path = os.path.join(OUT_DIR, "variant_pairs.parquet")
+    out_df.to_parquet(out_path, index=False)
+    print("saved:", out_path)
+
+if __name__ == "__main__":
+    main()
+
+
+StartCLR / start-loss variant 논문에서도 변이 주변 ±500bp~±1kb window로 HyenaDNA 인코딩을 수행했고, 이는 VEP 태스크에서 잘 먹힌 전략이야.
+
+4. Step 2 – PyTorch Dataset/Dataloader (ref–variant 쌍)
+
+src/dataset.py:
+
+import torch
+from torch.utils.data import Dataset
+import pandas as pd
+
+class VariantPairDataset(Dataset):
+    def __init__(self, parquet_path):
+        self.df = pd.read_parquet(parquet_path)
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        item = {
+            "seq_ref": row["seq_ref"],
+            "seq_var": row["seq_var"],
+            "patho": float(row["patho"]),
+            "n_mut": float(row["n_mut"]),
+            "ref_id": row["ref_id"],
+            "var_id": row["var_id"],
+        }
+        return item
+
+def collate_fn(batch, tokenizer, max_len=1001, device="cuda"):
+    seq_ref = [b["seq_ref"] for b in batch]
+    seq_var = [b["seq_var"] for b in batch]
+    y = torch.tensor([b["patho"] for b in batch], dtype=torch.float32)
+    n_mut = torch.tensor([b["n_mut"] for b in batch], dtype=torch.float32)
+
+    enc_ref = tokenizer(
+        seq_ref,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=max_len,
+    )
+    enc_var = tokenizer(
+        seq_var,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=max_len,
+    )
+    enc_ref = {k: v.to(device) for k, v in enc_ref.items()}
+    enc_var = {k: v.to(device) for k, v in enc_var.items()}
+
+    return enc_ref, enc_var, y.to(device), n_mut.to(device), batch
+
+5. Step 3 – HyenaDNA backbone + projection head
+5-1. HyenaDNA tiny-1k d256 불러오기
+
+HF 컬렉션에 따르면 LongSafari/hyenadna-tiny-1k-seqlen-d256-hf는
+HuggingFace AutoModel classes로 직접 사용 가능하도록 되어 있음.
+
+src/model_hyenadna.py:
+
+import torch
+import torch.nn as nn
+from transformers import AutoTokenizer, AutoModel
+
+HYENA_CKPT = "LongSafari/hyenadna-tiny-1k-seqlen-d256-hf"
+
+def get_tokenizer():
+    tokenizer = AutoTokenizer.from_pretrained(HYENA_CKPT)
+    return tokenizer
+
+class HyenaVariantModel(nn.Module):
+    """
+    HyenaDNA backbone + pooling + projection
+    최종 임베딩 차원: emb_dim (<= 2048)
+    """
+    def __init__(self, emb_dim=256):
+        super().__init__()
+        self.backbone = AutoModel.from_pretrained(
+            HYENA_CKPT,
+            trust_remote_code=True
+        )
+        hidden_size = self.backbone.config.hidden_size
+        self.emb_dim = emb_dim
+
+        # mean pooling + linear projection (모델 내부 representation layer)
+        self.proj = nn.Linear(hidden_size, emb_dim)
+
+    def encode(self, **tokens):
+        # hidden_states 필요하면 output_hidden_states=True 설정
+        outputs = self.backbone(**tokens, output_hidden_states=True)
+        # 마지막 히든 사용 (B, L, H)
+        last_hidden = outputs.last_hidden_state
+        # 간단한 mean pooling
+        emb = last_hidden.mean(dim=1)  # (B, H)
+        emb = self.proj(emb)           # (B, emb_dim)
+        # L2 normalize → cosine distance와 잘 맞게
+        emb = emb / (emb.norm(dim=-1, keepdim=True) + 1e-8)
+        return emb
+
+    def forward(self, ref_tokens, var_tokens):
+        emb_ref = self.encode(**ref_tokens)
+        emb_var = self.encode(**var_tokens)
+        return emb_ref, emb_var
+
+
+여기서 emb_dim을 256 또는 512 정도로 두면
+
+제출 시 emb_0000 ~ emb_0255 or emb_0511까지 생성하면 됨 (2048 이하이므로 문제 없음).
+
+중요:
+여기서 projection까지 포함한 전체 forward를 “우리의 gLM”으로 간주하면,
+대회 규칙의 “추론 결과 후처리”가 아니라 모델 내부 레이어로 보는 게 자연스러움.
+
+6. Step 4 – contrastive 학습 (CD/CDD/PCC에 직결되는 loss 설계)
+6-1. distance 정의 (대회 지표와 동일)
+def cosine_distance(a, b, eps=1e-8):
+    # a, b: (B, D) L2-normalized
+    cos_sim = (a * b).sum(dim=-1)
+    return 1.0 - cos_sim  # (B,)
+
+
+여러 zero-shot VEP 연구에서 1 − cosine similarity를 variant effect score로 쓰는 것이 일반적이야.
+
+6-2. 병적/양성에 따른 margin-based contrastive loss (CD + CDD)
+
+병적(patho=1)은 ref에서 멀어지게(d↑),
+양성(patho=0)은 ref에 가까워지게(d↓) 만드는 margin loss:
+
+𝐿
+patho
+=
+𝑦
+⋅
+max
+⁡
+(
+0
+,
+𝑚
+pos
+−
+𝑑
+)
+2
++
+(
+1
+−
+𝑦
+)
+⋅
+max
+⁡
+(
+0
+,
+𝑑
+−
+𝑚
+neg
+)
+2
+L
+patho
+	​
+
+=y⋅max(0,m
+pos
+	​
+
+−d)
+2
++(1−y)⋅max(0,d−m
+neg
+	​
+
+)
+2
+
+𝑚
+neg
+<
+𝑚
+pos
+m
+neg
+	​
+
+<m
+pos
+	​
+
+ (예: 0.3, 0.7)
+
+6-3. 변이 개수와 distance 정렬 (PCC↑)
+
+변이 개수 
+𝑘
+=
+𝑛
+mut
+k=n
+mut
+	​
+
+ 와 
+𝑑
+d 사이에 양의 상관을 만들고 싶은데,
+LLMED나 DNABERT-S류처럼 edit distance와 embedding distance를 align하는 regression/contrastive loss가 잘 쓰임.
+
+간단하게:
+
+𝑘
+~
+=
+𝑘
+/
+𝑘
+max
+⁡
+∈
+[
+0
+,
+1
+]
+k
+~
+=k/k
+max
+	​
+
+∈[0,1] 로 정규화
+
+batch에서 
+𝑑
+d도 [0,1] 근처에 있도록 margin 세팅
+
+MSE 기반:
+
+𝐿
+mut
+=
+MSE
+(
+𝑑
+,
+𝑘
+~
+)
+L
+mut
+	​
+
+=MSE(d,
+k
+~
+)
+
+→ 이렇게 하면 mut 수가 많을수록 d가 커지도록 유도됨.
+
+6-4. 전체 loss
+𝐿
+=
+𝜆
+1
+𝐿
+patho
++
+𝜆
+2
+𝐿
+mut
+L=λ
+1
+	​
+
+L
+patho
+	​
+
++λ
+2
+	​
+
+L
+mut
+	​
+
+
+𝜆
+1
+≈
+1.0
+,
+𝜆
+2
+≈
+0.2
+λ
+1
+	​
+
+≈1.0,λ
+2
+	​
+
+≈0.2 정도에서 시작
+
+6-5. 학습 스크립트 골격 src/train_contrastive.py
+# src/train_contrastive.py
+import os
+import torch
+from torch.utils.data import DataLoader, random_split
+from torch.cuda.amp import autocast, GradScaler
+from tqdm import tqdm
+
+from dataset import VariantPairDataset, collate_fn
+from model_hyenadna import HyenaVariantModel, get_tokenizer
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DATA_PATH = "./data/external_processed/variant_pairs.parquet"
+SAVE_DIR = "./output/checkpoints"
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+BATCH_SIZE = 8  # 4GB VRAM이므로 작게
+EPOCHS = 5
+
+def cosine_distance(a, b, eps=1e-8):
+    cos_sim = (a * b).sum(dim=-1)
+    return 1.0 - cos_sim
+
+def train():
+    tokenizer = get_tokenizer()
+    dataset = VariantPairDataset(DATA_PATH)
+    n_total = len(dataset)
+    n_train = int(n_total * 0.9)
+    n_val = n_total - n_train
+    train_ds, val_ds = random_split(dataset, [n_train, n_val])
+
+    def collate_train(batch):
+        return collate_fn(batch, tokenizer, max_len=1001, device=DEVICE)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        collate_fn=collate_train,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=BATCH_SIZE,
+        shuffle=False,
+        collate_fn=collate_train,
+    )
+
+    model = HyenaVariantModel(emb_dim=256).to(DEVICE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
+    scaler = GradScaler()
+
+    m_pos, m_neg = 0.7, 0.3
+    lambda_mut = 0.2
+    max_mut = 5.0  # n_mut 최대값 (SNV만이면 1로 잡아도 됨)
+
+    for epoch in range(1, EPOCHS + 1):
+        model.train()
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch} [train]")
+        total_loss = 0.0
+
+        for ref_tokens, var_tokens, y, n_mut, raw_batch in pbar:
+            optimizer.zero_grad()
+            with autocast(enabled=(DEVICE=="cuda")):
+                emb_ref, emb_var = model(ref_tokens, var_tokens)
+                d = cosine_distance(emb_ref, emb_var)  # (B,)
+
+                # patho vs benign margin loss
+                # y=1 (patho): d >= m_pos
+                loss_pos = torch.clamp(m_pos - d, min=0.0) ** 2
+                # y=0 (benign): d <= m_neg
+                loss_neg = torch.clamp(d - m_neg, min=0.0) ** 2
+                L_patho = (y * loss_pos + (1 - y) * loss_neg).mean()
+
+                # n_mut regression loss (PCC proxy)
+                k_tilde = torch.clamp(n_mut / max_mut, 0.0, 1.0)
+                L_mut = torch.mean((d - k_tilde) ** 2)
+
+                loss = L_patho + lambda_mut * L_mut
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_loss += loss.item()
+            pbar.set_postfix(loss=total_loss / (pbar.n or 1))
+
+        # epoch 끝나고 검증 (CD/CDD/PCC proxy)
+        metrics = evaluate(model, val_loader)
+        print(f"[Epoch {epoch}] val metrics:", metrics)
+
+        ckpt_path = os.path.join(SAVE_DIR, f"hyena_epoch{epoch}.pt")
+        torch.save(model.state_dict(), ckpt_path)
+        print("saved:", ckpt_path)
+
+def evaluate(model, val_loader):
+    from eval_metrics import compute_cd_cdd_pcc
+    model.eval()
+    all_rows = []
+    with torch.no_grad():
+        for ref_tokens, var_tokens, y, n_mut, raw_batch in tqdm(val_loader, desc="Eval"):
+            emb_ref, emb_var = model(ref_tokens, var_tokens)
+            d = cosine_distance(emb_ref, emb_var).cpu().numpy()
+            for i, r in enumerate(raw_batch):
+                all_rows.append({
+                    "ref_id": r["ref_id"],
+                    "var_id": r["var_id"],
+                    "patho": r["patho"],
+                    "n_mut": r["n_mut"],
+                    "dist": float(d[i]),
+                })
+    import pandas as pd
+    df = pd.DataFrame(all_rows)
+    return compute_cd_cdd_pcc(df)
+
+if __name__ == "__main__":
+    train()
+
+7. Step 5 – CD / CDD / PCC proxy 계산 코드
+
+src/eval_metrics.py:
+
+import numpy as np
+import pandas as pd
+
+def compute_cd_cdd_pcc(df: pd.DataFrame):
+    """
+    df: columns = [ref_id, var_id, patho, n_mut, dist]
+    dist: cosine distance = 1 - cos_sim
+    """
+    # 1) CD: 전체 ref-variant cosine distance 평균
+    cd = df["dist"].mean()
+
+    # 2) CDD: patho vs benign 평균 거리 차이
+    d_patho = df.loc[df["patho"] == 1, "dist"]
+    d_benign = df.loc[df["patho"] == 0, "dist"]
+    cdd = d_patho.mean() - d_benign.mean()
+
+    # 3) PCC: ref별 n_mut vs dist 상관
+    pcc_list = []
+    for ref_id, g in df.groupby("ref_id"):
+        if g["n_mut"].nunique() < 2:
+            continue
+        x = g["n_mut"].values.astype(float)
+        y = g["dist"].values.astype(float)
+        # 피어슨
+        vx = np.var(x)
+        vy = np.var(y)
+        if vx == 0 or vy == 0:
+            continue
+        r = np.corrcoef(x, y)[0,1]
+        pcc_list.append(r)
+    pcc = float(np.mean(pcc_list)) if pcc_list else 0.0
+
+    return {"CD": float(cd), "CDD": float(cdd), "PCC": float(pcc)}
+
+
+이 지표들은 Dacon 공식 평가식과 거의 같은 구조라,
+외부 데이터에서 이 세 개를 키우도록 하이퍼파라미터를 튜닝하면
+실제 MAI 리더보드에서도 상관이 꽤 있을 거라고 기대할 수 있어.
+(여러 zero-shot VEP 벤치마크에서도 코사인 거리 기반 학습/튜닝이 variant effect 성능을 잘 예측함.)
+
+8. Step 6 – Dacon test.csv 임베딩 & 제출 파일 생성
+
+src/infer_and_submit.py:
+
+import os
+import numpy as np
+import pandas as pd
+import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from model_hyenadna import HyenaVariantModel, get_tokenizer
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+def main():
+    BASE_DIR = "./data/dacon"
+    TEST_PATH = os.path.join(BASE_DIR, "test.csv")
+    SAMPLE_SUB_PATH = os.path.join(BASE_DIR, "sample_submission.csv")
+    OUT_DIR = "./output/submissions"
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    # 1) 모델 로드 (성능 제일 좋던 epoch 체크포인트 선택)
+    model = HyenaVariantModel(emb_dim=256).to(DEVICE)
+    ckpt = "./output/checkpoints/hyena_epoch5.pt"
+    model.load_state_dict(torch.load(ckpt, map_location=DEVICE))
+    model.eval()
+
+    tokenizer = get_tokenizer()
+
+    # 2) test.csv 로드
+    test_df = pd.read_csv(TEST_PATH)
+    ids = test_df["ID"].values
+    seqs = test_df["seq"].values
+
+    BATCH_SIZE = 32
+    all_embs = []
+
+    for i in tqdm(range(0, len(seqs), BATCH_SIZE), desc="Infer test"):
+        batch_seqs = list(seqs[i:i+BATCH_SIZE])
+        enc = tokenizer(
+            batch_seqs,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=1001,
+        ).to(DEVICE)
+
+        with torch.no_grad():
+            # ref/var 구분 없이 단일 서열 인코딩만 하면 됨
+            emb = model.encode(**enc)  # (B, D)
+            emb = emb.cpu().numpy()
+            all_embs.append(emb)
+
+    all_embs = np.vstack(all_embs)  # (N, D)
+    n, d = all_embs.shape
+    print("test embeddings shape:", all_embs.shape)
+
+    # 3) sample_submission 포맷에 맞게 저장
+    #    컬럼명: emb_0000 ~ emb_{d-1}
+    emb_cols = [f"emb_{i:04d}" for i in range(d)]
+    sub_df = pd.DataFrame(all_embs, columns=emb_cols)
+    sub_df.insert(0, "ID", ids)
+
+    out_path = os.path.join(OUT_DIR, "submission_YYYYMMDD_hyena256.csv")
+    sub_df.to_csv(out_path, index=False)
+    print("saved submission:", out_path)
+
+if __name__ == "__main__":
+    main()
+
+
+이렇게 생성된 **임베딩 벡터는 전부 동일 차원(256)**이고,
+직접 gLM(HyenaDNA+projection) forward 결과이므로 “후처리”가 아니라 모델 출력으로 볼 수 있음.
+
+Dacon 평가 서버는 내부에서 ref/variant 매핑을 알고 있으니,
+우리가 튜닝한 CD/CDD/PCC 민감도가 곧 리더보드 점수로 반영될 거야.
+
+9. 요약: “이 대회용 HyenaDNA 전략” 한 장짜리 버전
+
+모델 선택
+
+LongSafari/hyenadna-tiny-1k-seqlen-d256-hf (Apache 계열 라이선스, 4GB GPU에서도 학습 가능)
+
+외부 데이터
+
+ClinVar, BEND 등에서 (ref, variant) window 서열과 pathogenic/benign 라벨 수집.
+
+VCF + reference.fa → variant_pairs.parquet 구성.
+
+학습 목표 (loss)
+
+병적(patho=1): ref–variant cosine distance 
+𝑑
+d 크게
+
+양성(patho=0): 
+𝑑
+d 작게
+
+변이 개수 n_mut가 증가할수록 
+𝑑
+d도 커지도록 regression loss 추가.
+
+StartCLR / LLMED / DNABERT-S / DNASimCLR 계열에서 사용한
+contrastive + cosine distance 기반 학습 아이디어를 그대로 gLM에 적용.
+
+검증 전략
+
+external validation에서 CD / CDD / PCC proxy를 직접 계산해서
+
+CD↑ : ref–variant 평균 거리 충분히 크고
+
+CDD↑ : 병적과 양성 distance 평균이 잘 분리되고
+
+PCC↑ : n_mut 증가에 따라 distance가 잘 증가
+
+이 세 지표의 균형이 가장 좋은 checkpoint를 선택 → 최종 제출 모델.
+
+대회 test 예측
+
+Dacon test.csv seq를 위 모델로 인코딩 → (N, D) 임베딩
+
+emb_0000~emb_0{D-1} 컬럼으로 csv 저장하여 제출.
+
+이대로 구현하면,
+논문에서 검증된 “변이 민감도↑ contrastive 학습” 구조를
+HyenaDNA + MAI 평가식에 맞게 튜닝한 파이프라인이 되는 거라,
+현실적인 HW(1050 Ti 4GB)에서도 충분히 승부를 볼 수 있을 거야.
+
+다음에 너가 실제로 variant_pairs.parquet를 어느 정도 만들어서 row 수 / patho 비율 / n_mut 분포를 알려주면,
+그 분포에 맞춰서 **하이퍼파라미터 세부 튜닝 전략(윈도우 길이, margin, λ 값, batch 구성 비율 등)**도 더 촘촘하게 잡아줄게.
 
