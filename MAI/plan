@@ -1,0 +1,130 @@
+0. 먼저, 평가지표를 모델 관점에서 다시 정의
+대회 설명 + 최근 gLM 논문들을 보면, 이 대회 평가지표는 사실상 이런 걸 요구하는 셈이야:
+
+
+CD:
+같은 유전자 영역에서 ref vs variant 임베딩 코사인 거리 평균
+→ “작은 SNV/indel을 모델이 얼마나 민감하게 구분하는지”를 보는 기본 variant-sensitivity
+
+
+CDD:
+병적(Pathogenic) vs 양성(Benign) 변이에 대해
+
+평균 코사인 거리 차이
+→ 병적 변이는 ref와 훨씬 멀게, 양성 변이는 ref와 가깝게 임베딩 되면 좋음
+비슷한 아이디어가 Nucleotide Transformer, HyenaDNA, GPN 계열에서 zero-shot variant effect 평가로 쓰이고 있음.
+
+
+
+PCC:
+각 reference 서열에 대해 “변이 개수”가 증가할수록 임베딩 거리도 커져야 함
+→ 한 염기, 두 염기, 세 염기… 바꿔가면서 거리의 단조 증가 / 거의 선형 관계가 유지되면 유리
+
+
+즉, 우리가 설계해야 하는 gLM은:
+
+
+SNV 수준의 작은 변화도 임베딩 각도(코사인 거리)에 잘 반영되게 만들고
+
+
+병적 vs 양성 변이에 대해 거리 분포를 최대한 분리시키고
+
+
+변이 개수(“mutational burden”)와 임베딩 거리 사이의 상관을 크게 만드는
+
+
+방향으로 학습되어야 해.
+
+1. 데이터 전략: 외부 데이터로 “평가지표를 흉내내는” 학습 세트 만들기
+대회에서 train이 없으니까, 평가지표 구조와 최대한 비슷한 외부 데이터 구성을 먼저 잡는 게 중요해.
+1-1. 추천 외부 데이터 소스 (규칙 충족 전제)
+모두 2025년 11월 9일 이전에 공개되고, 비상업/상업 허용 라이선스가 명확한 것만 써야 함. 아래는 “변이 ↔ ref 서열 + 병적/양성 라벨”을 동시에 제공하는 대표적인 소스들:
+
+
+ClinVar: 인간 변이의 pathogenic / benign / VUS 라벨
+
+
+여러 gLM / PLM 기반 pathogenicity 논문에서 표준처럼 사용 중.
+
+
+
+
+BEND / GenomicBenchmarks의 Variant Effect Tasks
+
+
+BEND는 여러 noncoding variant effect task에서 ref/alt 서열 쌍 + 실험적 효과값을 제공하고, 일부 태스크에서는 코사인 거리 자체를 predictor로 씀.
+
+
+
+
+Nucleotide Transformer / HyenaDNA에서 사용한 VEP(Variant Effect Prediction) 데이터셋
+
+
+논문 및 GitHub·HF repo에 태스크 구성과 데이터 경로가 공개돼 있음. 여기서도 “ref vs mutant embedding 거리”가 VEP 점수로 쓰임.
+
+
+
+
+
+사용 전에는: **데이터 공개 시점 + 라이선스(특히 상업/비상업)**를 한 번 더 확인하는 게 좋음.
+
+1-2. 우리가 만들 “학습용 데이터 구조”
+이 대회를 겨냥해서, 최소 아래 수준의 테이블 구조를 추천할게:
+① variant_table (변이 메타 정보)
+컬럼명설명var_id변이 ID (고유 키)ref_id해당 변이가 속한 reference 서열 IDchrom, pos염색체 / 위치 (있으면 좋음)ref_allele, alt_allele염기 수준 변이 정보consequencemissense / synonymous / splice / promoter 등patho_label{0: benign, 1: pathogenic}n_mut_sites이 variant가 ref와 다른 염기 개수 (SNV+indel 개수)sourceClinVar / BEND / NT-VEP 등 출처
+② sequence_table (실제 입력 서열)
+컬럼명설명seq_id서열 ID (고유 키)ref_id어떤 reference에서 왔는지var_id해당 변이에 대응되는 var_id (ref면 NULL 가능)is_ref1이면 reference, 0이면 variant 서열seqA/C/G/T 문자열 (대회 test.csv와 같은 형식)window_sizevariant 주변 window 길이 (예: 1kb, 4kb 등)
+이렇게 하면:
+
+
+한 ref_id 아래 여러 var_id가 매달려 있고
+
+
+각 var_id마다 ref/alt 서열이 pair로 등장
+→ CD, CDD, PCC를 그대로 offline에서 계산해서 모델을 조정할 수 있음.
+
+
+
+2. gLM 선택: 어떤 베이스 모델을 쓸까?
+규칙상 로컬에서 돌릴 수 있는 사전학습 gLM만 허용.
+GPU가 있다면 아래 순서를 추천:
+2-1. 후보 모델들
+
+
+HyenaDNA (HazyResearch, 2023, Apache-2.0)
+
+
+장점
+
+
+single-nucleotide 토큰 + 최대 1M context → SNV 감지에 강점
+
+
+BEND / VEP 태스크에서 좋은 variant effect 성능 보고
+
+
+
+
+단점: 구현이 조금 무겁고, GPU 메모리 요구량이 큼.
+
+
+
+
+Nucleotide Transformer (NT) (InstaDeep, 2023, HuggingFace 공개)
+
+
+장점
+
+
+6-mer 기반 토크나이저 + 500M~2.5B 파라미터
+
+
+논문에서 cosine similarity 기반 zero-shot variant prioritization이 여러 실험에서 높은 설명력 (r² 절대값 ~0.3~0.35) 보여줌.
+
+
+이미 많은 VEP 벤치마크 코드가 정리돼 있음.
+
+
+
+
+
