@@ -15,6 +15,7 @@ from sklearn.isotonic import IsotonicRegression
 from tqdm import tqdm
 import joblib
 import warnings
+import pickle  
 warnings.filterwarnings('ignore')
 
 print("Big-Tech ML Engineer (v18+Delta+log_ratio): K-Fold + Leakage Fix + Domain Features 시작.")
@@ -41,6 +42,24 @@ MODEL_SAVE_DIR = "./model"
 os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
 FEATURE_SAVE_PATH = os.path.join(BASE_DIR, "all_train_data.feather")
+
+# --- [이 부분 추가] ---
+# 원본 로그 재현을 위해 1단계에서 저장한 피처 순서 로드
+try:
+    with open(os.path.join(MODEL_SAVE_DIR, "original_a_features.pkl"), "rb") as f:
+        ORIGINAL_A_FEATURES = pickle.load(f)
+    with open(os.path.join(MODEL_SAVE_DIR, "original_b_features.pkl"), "rb") as f:
+        ORIGINAL_B_FEATURES = pickle.load(f)
+    print(f"[재현] 원본 A 피처 순서 로드 완료 ({len(ORIGINAL_A_FEATURES)}개)")
+    print(f"[재현] 원본 B 피처 순서 로드 완료 ({len(ORIGINAL_B_FEATURES)}개)")
+except FileNotFoundError:
+    print("="*50)
+    print("경고: 원본 피처 순서 파일(original_..._features.pkl)을 찾을 수 없습니다.")
+    print("재현이 불가능하며, sort() 기반으로 실행됩니다.")
+    print("먼저 1단계(피처 순서 추출/저장)를 실행하세요.")
+    print("="*50)
+    ORIGINAL_A_FEATURES = None
+    ORIGINAL_B_FEATURES = None
 
 try:
     print("전처리된 메인 피처 로드 중...")
@@ -140,11 +159,7 @@ def _build_cb_matrices(X_train, X_val):
 ## 5. 모델 학습 함수
 def train_model_A(X_train, y_train, X_val, y_val, group_label="A"):
     """
-    A 모델: PK Stats 사용 안 함
-      - 전략 2: pk_hist_* 피처
-      - 전략 3: Age_num_z, YearMonthIndex_z
-      + log_ratio 기반 도메인 피처
-      + Delta 피처는 명시적으로 제거
+    A 모델: [재현용 수정] _build_cb_matrices로 생성 후, ORIGINAL_A_FEATURES 순서로 강제 재정렬
     """
     # delta_* 열 제거 (A는 Delta 미사용)
     drop_delta = [c for c in X_train.columns if _is_delta_column(c)]
@@ -152,14 +167,46 @@ def train_model_A(X_train, y_train, X_val, y_val, group_label="A"):
         X_train = X_train.drop(columns=drop_delta, errors="ignore")
         X_val   = X_val.drop(columns=drop_delta, errors="ignore")
 
-    cb_X_train, cb_X_val, cat_features_indices = _build_cb_matrices(X_train, X_val)
+    # [수정] 원본의 set()을 사용한 함수 호출 (변수명 변경: _unordered)
+    cb_X_train_unordered, cb_X_val_unordered, _ = _build_cb_matrices(X_train, X_val)
 
+    # --- [이 부분 추가: 재현용 강제 정렬] ---
+    if ORIGINAL_A_FEATURES is not None:
+        print("[재현] 'ORIGINAL_A_FEATURES' 순서로 강제 재정렬...")
+        try:
+            # 원본 순서 리스트에서, 현재 데이터프레임에 실제 있는 컬럼들만 필터링
+            current_original_order = [f for f in ORIGINAL_A_FEATURES if f in cb_X_train_unordered.columns]
+            
+            cb_X_train = cb_X_train_unordered[current_original_order].copy()
+            cb_X_val = cb_X_val_unordered[current_original_order].copy()
+            
+            # Cat feature 인덱스도 이 순서 기준으로 다시 계산
+            cat_features_indices = [cb_X_train.columns.get_loc(c) for c in CAT_FEATURES if c in cb_X_train.columns]
+
+        except Exception as e:
+            print(f"!!! [재현 오류] 원본 피처 순서 재정렬 실패: {e}. sort() 버전으로 강제 실행됩니다.")
+            # 실패 시 sort() 버전으로라도 실행
+            numeric_cols = sorted([c for c in cb_X_train_unordered.columns if c not in CAT_FEATURES])
+            final_cols = numeric_cols + [c for c in CAT_FEATURES if c in cb_X_train_unordered.columns]
+            cb_X_train = cb_X_train_unordered[final_cols].copy()
+            cb_X_val = cb_X_val_unordered[final_cols].copy()
+            cat_features_indices = [cb_X_train.columns.get_loc(c) for c in CAT_FEATURES if c in cb_X_train.columns]
+    
+    else: # 원본 피처 리스트 파일 로드에 실패한 경우 (sort() 기반으로 실행)
+        print("[재현] sort() 기반으로 정렬 실행...")
+        numeric_cols = sorted([c for c in cb_X_train_unordered.columns if c not in CAT_FEATURES])
+        final_cols = numeric_cols + [c for c in CAT_FEATURES if c in cb_X_train_unordered.columns]
+        cb_X_train = cb_X_train_unordered[final_cols].copy()
+        cb_X_val = cb_X_val_unordered[final_cols].copy()
+        cat_features_indices = [cb_X_train.columns.get_loc(c) for c in CAT_FEATURES if c in cb_X_train.columns]
+    # --- [수정 끝] ---
+    
     print(f"\n[{group_label}] CatBoost (Base+Hist+Norm+log_ratio, no PK, no Delta) 학습 시작... (피처 {len(cb_X_train.columns)}개)")
     cat_base_model = cb.CatBoostClassifier(
         iterations=3000,
         loss_function='Logloss',
         eval_metric='AUC',
-        random_seed=1111,
+        random_seed=42,
         thread_count=-1,
         early_stopping_rounds=100,
         verbose=1000,
@@ -188,13 +235,45 @@ def train_model_A(X_train, y_train, X_val, y_val, group_label="A"):
 
 def train_model_B(X_train, y_train, X_val, y_val, pk_stats_fold, group_label="B"):
     """
-    B 모델: PK Stats + Delta(B-only) + log_ratio 모두 사용
+    B 모델: [재현용 수정] PK Stats 머지 후, ORIGINAL_B_FEATURES 순서로 강제 재정렬
     """
     # PK Stats merge
     X_train = X_train.merge(pk_stats_fold, on='PrimaryKey', how='left')
     X_val   = X_val.merge(pk_stats_fold,   on='PrimaryKey', how='left')
 
-    cb_X_train, cb_X_val, cat_features_indices = _build_cb_matrices(X_train, X_val)
+    # [수정] 원본의 set()을 사용한 함수 호출 (변수명 변경: _unordered)
+    cb_X_train_unordered, cb_X_val_unordered, _ = _build_cb_matrices(X_train, X_val)
+
+    # --- [이 부분 추가: 재현용 강제 정렬] ---
+    if ORIGINAL_B_FEATURES is not None:
+        print("[재현] 'ORIGINAL_B_FEATURES' 순서로 강제 재정렬...")
+        try:
+            # 원본 순서 리스트에서, 현재 데이터프레임에 실제 있는 컬럼들만 필터링
+            current_original_order = [f for f in ORIGINAL_B_FEATURES if f in cb_X_train_unordered.columns]
+
+            cb_X_train = cb_X_train_unordered[current_original_order].copy()
+            cb_X_val = cb_X_val_unordered[current_original_order].copy()
+            
+            # Cat feature 인덱스도 이 순서 기준으로 다시 계산
+            cat_features_indices = [cb_X_train.columns.get_loc(c) for c in CAT_FEATURES if c in cb_X_train.columns]
+
+        except Exception as e:
+            print(f"!!! [재현 오류] 원본 피처 순서 재정렬 실패: {e}. sort() 버전으로 강제 실행됩니다.")
+            # 실패 시 sort() 버전으로라도 실행
+            numeric_cols = sorted([c for c in cb_X_train_unordered.columns if c not in CAT_FEATURES])
+            final_cols = numeric_cols + [c for c in CAT_FEATURES if c in cb_X_train_unordered.columns]
+            cb_X_train = cb_X_train_unordered[final_cols].copy()
+            cb_X_val = cb_X_val_unordered[final_cols].copy()
+            cat_features_indices = [cb_X_train.columns.get_loc(c) for c in CAT_FEATURES if c in cb_X_train.columns]
+    
+    else: # 원본 피처 리스트 파일 로드에 실패한 경우 (sort() 기반으로 실행)
+        print("[재현] sort() 기반으로 정렬 실행...")
+        numeric_cols = sorted([c for c in cb_X_train_unordered.columns if c not in CAT_FEATURES])
+        final_cols = numeric_cols + [c for c in CAT_FEATURES if c in cb_X_train_unordered.columns]
+        cb_X_train = cb_X_train_unordered[final_cols].copy()
+        cb_X_val = cb_X_val_unordered[final_cols].copy()
+        cat_features_indices = [cb_X_train.columns.get_loc(c) for c in CAT_FEATURES if c in cb_X_train.columns]
+    # --- [수정 끝] ---
 
     # Delta 사용 열 수 체크
     n_delta_train = sum(_is_delta_column(c) for c in cb_X_train.columns)
@@ -205,7 +284,7 @@ def train_model_B(X_train, y_train, X_val, y_val, pk_stats_fold, group_label="B"
         iterations=3000,
         loss_function='Logloss',
         eval_metric='AUC',
-        random_seed=1111,
+        random_seed=42,
         thread_count=-1,
         early_stopping_rounds=100,
         verbose=1000,
